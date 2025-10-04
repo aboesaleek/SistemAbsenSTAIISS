@@ -70,7 +70,7 @@ export const UsersView: React.FC = () => {
             // Assuming 'profiles' table has {id, role, username}
             setUsers(data || []);
         } catch (error: any) {
-            alert(`فشل في جلب المستخدمين: ${error.message}`);
+            console.error(`فشل في جلب المستخدمين: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -87,7 +87,7 @@ export const UsersView: React.FC = () => {
         const role = roleRef.current?.value as AppRole;
 
         if (!email || !password || !role) {
-            alert("يرجى ملء جميع الحقول.");
+            console.error("يرجى ملء جميع الحقول.");
             return;
         }
 
@@ -116,15 +116,14 @@ export const UsersView: React.FC = () => {
                 // For now, we'll just show the error.
                 throw profileError;
             }
-
-            alert("تمت إضافة المستخدم بنجاح!");
+            
             fetchUsers(); // Refresh the list
             // Clear form
             emailRef.current!.value = '';
             passwordRef.current!.value = '';
             
         } catch (error: any) {
-            alert(`فشل في إضافة المستخدم: ${error.message}`);
+            console.error(`فشل في إضافة المستخدم: ${error.message}`);
         } finally {
             setLoading(false);
         }

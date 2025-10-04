@@ -28,7 +28,7 @@ export const PermissionsView: React.FC = () => {
                 if (studentsError) throw studentsError;
                 setStudents(studentsData || []);
             } catch (error: any) {
-                alert(`فشل في جلب البيانات: ${error.message}`);
+                console.error(`فشل في جلب البيانات: ${error.message}`);
             } finally {
                 setLoading(false);
             }
@@ -66,7 +66,7 @@ export const PermissionsView: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedStudentId || !date || !permissionType) {
-            alert('يرجى ملء جميع الحقول المطلوبة.');
+            console.error('يرجى ملء جميع الحقول المطلوبة.');
             return;
         }
         
@@ -78,9 +78,8 @@ export const PermissionsView: React.FC = () => {
         });
 
         if (error) {
-            alert(`فشل تسجيل الإذن: ${error.message}`);
+            console.error(`فشل تسجيل الإذن: ${error.message}`);
         } else {
-            alert('تم تسجيل الإذن بنجاح!');
             // Reset form
             setSearchQuery('');
             setSelectedClassId('');

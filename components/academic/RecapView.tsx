@@ -88,7 +88,7 @@ export const RecapView: React.FC = () => {
             
             setRecords(combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         } catch (error: any) {
-             alert(`فشل في جلب البيانات: ${error.message}`);
+             console.error(`فشل في جلب البيانات: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -110,15 +110,12 @@ export const RecapView: React.FC = () => {
     }, [records, searchQuery, selectedClassId, startDate, endDate]);
 
     const deleteRecord = async (record: CombinedRecord) => {
-        if (!confirm('هل أنت متأكد أنك تريد الحذف؟')) return;
-        
         const tableName = record.sourceType === 'permission' ? 'academic_permissions' : 'academic_absences';
         const { error } = await supabase.from(tableName).delete().eq('id', record.sourceId);
 
         if (error) {
-            alert(`فشل الحذف: ${error.message}`);
+            console.error(`فشل الحذف: ${error.message}`);
         } else {
-            alert('تم الحذف بنجاح.');
             fetchData(); // Refresh data
         }
     };

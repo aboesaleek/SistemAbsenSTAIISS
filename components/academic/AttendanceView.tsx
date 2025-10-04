@@ -42,7 +42,7 @@ export const AttendanceView: React.FC = () => {
                 setCourses(coursesData || []);
 
             } catch (error: any) {
-                alert(`فشل في جلب البيانات: ${error.message}`);
+                console.error(`فشل في جلب البيانات: ${error.message}`);
             } finally {
                 setLoading(false);
             }
@@ -89,11 +89,11 @@ export const AttendanceView: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (markedAsAbsent.size === 0) {
-            alert('لم تحدد أي طالب كـ "غائب".');
+            console.error('لم تحدد أي طالب كـ "غائب".');
             return;
         }
         if (!selectedCourseId) {
-            alert('يرجى اختيار المادة الدراسية.');
+            console.error('يرجى اختيار المادة الدراسية.');
             return;
         }
         
@@ -106,9 +106,8 @@ export const AttendanceView: React.FC = () => {
         const { error } = await supabase.from('academic_absences').insert(absenceData);
 
         if (error) {
-            alert(`فشل تسجيل الغياب: ${error.message}`);
+            console.error(`فشل تسجيل الغياب: ${error.message}`);
         } else {
-            alert(`تم تسجيل غياب ${absenceData.length} طالب بنجاح.`);
             // Reset state after submission
             setMarkedAsAbsent(new Set());
             setSelectedClassId('');

@@ -38,7 +38,7 @@ const DataTable: React.FC<{
                         <tr key={items[rowIndex].id} className="bg-white border-b hover:bg-slate-50">
                             {row.map((cell, cellIndex) => <td key={cellIndex} className="px-6 py-4">{cell}</td>)}
                             <td className="px-6 py-4 flex gap-3">
-                                <button className="text-blue-600 hover:text-blue-800" onClick={() => alert('ميزة التعديل قيد التطوير.')}>
+                                <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
                                     <EditIcon className="w-5 h-5" />
                                 </button>
                                 {onDelete && (
@@ -90,7 +90,7 @@ export const DormitoryView: React.FC = () => {
                 errorMessage += '\n\n(هذا يعني على الأرجح أن سياسة أمان قاعدة البيانات تمنع الوصول. تحقق من أدوار المستخدم وسياسات RLS.)';
             }
 
-            alert(`فشل في جلب بيانات المهجع: ${errorMessage}`);
+            console.error(`فشل في جلب بيانات المهجع: ${errorMessage}`);
         } finally {
             setLoading(false);
         }
@@ -109,23 +109,19 @@ export const DormitoryView: React.FC = () => {
         const { error } = await supabase.from(tableName).insert(items);
         
         if (error) {
-            alert(`فشل في الإضافة: ${error.message}`);
+            console.error(`فشل في الإضافة: ${error.message}`);
         } else {
-            alert(`تمت إضافة ${items.length} عنصر بنجاح.`);
             ref.current!.value = '';
             fetchData(); // Refresh data
         }
     };
     
     const handleDelete = async (id: string | number, tableName: string) => {
-        if (!confirm('هل أنت متأكد أنك تريد الحذف؟')) return;
-
         const { error } = await supabase.from(tableName).delete().eq('id', id);
 
         if (error) {
-            alert(`فشل في الحذف: ${error.message}`);
+            console.error(`فشل في الحذف: ${error.message}`);
         } else {
-            alert('تم الحذف بنجاح.');
             fetchData(); // Refresh data
         }
     };
@@ -154,7 +150,7 @@ export const DormitoryView: React.FC = () => {
                     <button onClick={() => {
                         const dormitoryId = newStudentDormRef.current?.value;
                         if (!dormitoryId) {
-                            alert('يرجى اختيار المهجع أولاً.');
+                            console.error('يرجى اختيار المهجع أولاً.');
                             return;
                         }
                         // This assumes you add new students here.

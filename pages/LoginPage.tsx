@@ -15,7 +15,8 @@ const InputField: React.FC<{
   type: string;
   placeholder: string;
   id: string;
-}> = ({ icon, type, placeholder, id }) => (
+  onChange: () => void;
+}> = ({ icon, type, placeholder, id, onChange }) => (
   <div className="relative w-full">
     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
       {icon}
@@ -24,6 +25,7 @@ const InputField: React.FC<{
       id={id}
       type={type}
       placeholder={placeholder}
+      onChange={onChange}
       className="w-full bg-transparent border-b-2 border-gray-300/80 focus:border-teal-500 text-slate-700 placeholder-gray-500/70 py-3 pr-4 pl-12 transition-colors duration-300 focus:outline-none"
       required
     />
@@ -34,10 +36,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [mode, setMode] = useState<AppMode>(AppMode.ACADEMIC);
   const calligraphyPattern = "url(\"data:image/svg+xml,%3csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M25 10 C40 20, 60 20, 75 10' stroke='%235eead4' stroke-width='2' fill='none' stroke-linecap='round' opacity='0.2'/%3e%3cpath d='M10 25 C20 40, 20 60, 10 75' stroke='%235eead4' stroke-width='2' fill='none' stroke-linecap='round' opacity='0.2'/%3e%3cpath d='M90 25 C80 40, 80 60, 90 75' stroke='%235eead4' stroke-width='2' fill='none' stroke-linecap='round' opacity='0.2'/%3e%3cpath d='M25 90 C40 80, 60 80, 75 90' stroke='%235eead4' stroke-width='2' fill='none' stroke-linecap='round' opacity='0.2'/%3e%3cpath d='M50 20 C40 35, 40 65, 50 80' stroke='%232dd4bf' stroke-width='1.5' fill='none' stroke-linecap='round' opacity='0.15'/%3e%3cpath d='M20 50 C35 60, 65 60, 80 50' stroke='%232dd4bf' stroke-width='1.5' fill='none' stroke-linecap='round' opacity='0.15'/%3e%3c/svg%3e\")";
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage('');
 
     const email = (document.getElementById('email') as HTMLInputElement).value;
     const password = (document.getElementById('password') as HTMLInputElement).value;
@@ -50,7 +54,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
     if (authError || !authData.user) {
       setLoading(false);
-      alert(`فشل تسجيل الدخول: ${authError?.message || 'البريد الإلكتروني أو كلمة المرور غير صحيحة.'}`);
+      setErrorMessage(authError?.message || 'البريد الإلكتروني أو كلمة المرور غير صحيحة.');
       return;
     }
 
@@ -79,14 +83,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         }
 
         if (canAccess) {
-            alert('تم تسجيل الدخول بنجاح!');
             onLogin(e, mode);
         } else {
             throw new Error(`ليس لديك الإذن للوصول إلى وضع "${mode}".`);
         }
 
     } catch (error: any) {
-        alert(`فشل التفويض: ${error.message}`);
+        setErrorMessage(`فشل التفويض: ${error.message}`);
         supabase.auth.signOut(); // Log out the user if authorization fails
     } finally {
         setLoading(false);
@@ -116,17 +119,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <ModeToggle currentMode={mode} onModeChange={setMode} />
           
           <form className="space-y-6" onSubmit={handleFormSubmit}>
+            {errorMessage && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-center" role="alert">
+                    <span className="block sm:inline">{errorMessage}</span>
+                </div>
+            )}
             <InputField 
               id="email"
               type="email"
               placeholder="البريد الإلكتروني"
               icon={<UserIcon className="w-5 h-5" />}
+              onChange={() => setErrorMessage('')}
             />
             <InputField 
               id="password"
               type="password"
               placeholder="كلمة المرور"
               icon={<LockIcon className="w-5 h-5" />}
+              onChange={() => setErrorMessage('')}
             />
             <button
               type="submit"

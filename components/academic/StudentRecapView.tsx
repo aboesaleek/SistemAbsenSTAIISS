@@ -125,7 +125,7 @@ export const StudentRecapView: React.FC = () => {
                 
                 setAllRecords(combined);
             } catch (error: any) {
-                alert(`فشل في جلب البيانات: ${error.message}`);
+                console.error(`فشل في جلب البيانات: ${error.message}`);
             } finally {
                 setLoading(false);
             }

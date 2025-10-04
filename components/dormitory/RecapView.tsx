@@ -52,7 +52,7 @@ export const RecapView: React.FC = () => {
             setRecords(fetchedRecords);
 
         } catch (error: any) {
-            alert(`فشل في جلب البيانات: ${error.message}`);
+            console.error(`فشل في جلب البيانات: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -74,13 +74,10 @@ export const RecapView: React.FC = () => {
     }, [records, searchQuery, selectedDormitoryId, startDate, endDate]);
 
     const deleteRecord = async (id: string) => {
-        if (!confirm('هل أنت متأكد أنك تريد الحذف؟')) return;
-
         const { error } = await supabase.from('dormitory_permissions').delete().eq('id', id);
         if (error) {
-            alert(`فشل الحذف: ${error.message}`);
+            console.error(`فشل الحذف: ${error.message}`);
         } else {
-            alert('تم الحذف بنجاح.');
             fetchData();
         }
     };
