@@ -22,7 +22,7 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
     }
     const radius = 15.9155;
     const circumference = 2 * Math.PI * radius;
-    let accumulatedPercent = 0;
+    let accumulatedLength = 0;
 
     return (
         <div className="w-full flex flex-col items-center justify-center bg-slate-50/80 p-6 rounded-xl border border-slate-200/60 min-h-[316px]">
@@ -32,9 +32,10 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
                     <circle cx="18" cy="18" r={radius} className="stroke-current text-slate-200" strokeWidth="3" fill="transparent" />
                     {data.map((item, index) => {
                         if (item.value === 0) return null;
-                        const percent = (item.value / total) * 100;
-                        const strokeDashoffset = circumference - (accumulatedPercent / 100) * circumference;
-                        accumulatedPercent += percent;
+                        const segmentLength = (item.value / total) * circumference;
+                        const strokeDashoffset = accumulatedLength;
+                        accumulatedLength += segmentLength;
+
                         return (
                             <circle
                                 key={index}
@@ -44,8 +45,8 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
                                 className={`stroke-current ${item.color}`}
                                 strokeWidth="3.2"
                                 fill="transparent"
-                                strokeDasharray={`${circumference} ${circumference}`}
-                                style={{ strokeDashoffset }}
+                                strokeDasharray={`${segmentLength} ${circumference - segmentLength}`}
+                                strokeDashoffset={-strokeDashoffset}
                             />
                         );
                     })}
