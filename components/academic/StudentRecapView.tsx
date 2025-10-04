@@ -155,7 +155,28 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         const permissionRecords = records.filter(r => r.status === RecapStatus.PERMISSION);
         const sickRecords = records.filter(r => r.status === RecapStatus.SICK);
         const uniqueDays = new Set(records.map(r => r.date)).size;
-        return { absentRecords, permissionRecords, sickRecords, uniqueDays };
+
+        const absenceDetailsByCourse = new Map<string, string[]>();
+        absentRecords.forEach(record => {
+            const courseName = record.courseName || 'غير محدد';
+            if (!absenceDetailsByCourse.has(courseName)) {
+                absenceDetailsByCourse.set(courseName, []);
+            }
+            const dates = absenceDetailsByCourse.get(courseName)!;
+            if (dates.length < 3) { // Hanya simpan hingga 3 tanggal
+                dates.push(record.date);
+            }
+        });
+        // Urutkan tanggal untuk setiap mata kuliah
+        absenceDetailsByCourse.forEach(dates => dates.sort());
+
+        return {
+            absentRecords,
+            permissionRecords,
+            sickRecords,
+            uniqueDays,
+            absenceDetailsByCourse
+        };
     }, [selectedStudentId, allRecords]);
 
     const filteredStudents = useMemo(() => {
@@ -221,43 +242,68 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                 <div className="grid grid-cols-3 gap-3">
                                     <StatCard label="غائب" value={studentData.absentRecords.length} gradient="from-red-500 to-orange-500" />
                                     <StatCard label="إذن" value={studentData.permissionRecords.length} gradient="from-blue-500 to-sky-500" />
-                                    <StatCard label="مرض" value={studentData.sickRecords.length} gradient="from-amber-500 to-yellow-500" />
+                                    <StatCard label="مرض" value={studentData.sickRecords.length} gradient="from-yellow-400 to-yellow-500" />
                                 </div>
                             </div>
                             <DonutChart data={[
                                 {label: 'غائب', value: studentData.absentRecords.length, color: 'text-red-500', bgColor: 'bg-red-500'},
                                 {label: 'إذن', value: studentData.permissionRecords.length, color: 'text-blue-500', bgColor: 'bg-blue-500'},
-                                {label: 'مرض', value: studentData.sickRecords.length, color: 'text-amber-500', bgColor: 'bg-amber-500'},
+                                {label: 'مرض', value: studentData.sickRecords.length, color: 'text-yellow-500', bgColor: 'bg-yellow-500'},
                             ]} />
                         </div>
                     </div>
                 
                     <div className="bg-white p-6 rounded-2xl shadow-lg border">
                         <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل السجل</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-red-50/70 p-4 rounded-lg border border-red-200/80">
-                                <h4 className="font-bold text-red-800 mb-2 border-b-2 border-red-200 pb-2">سجل الغياب</h4>
-                                <ul className="space-y-2 text-sm text-red-900">
-                                    {studentData.absentRecords.length > 0 ? studentData.absentRecords.map(r => (
-                                        <li key={r.id}><strong>{r.date}:</strong> {r.courseName}</li>
-                                    )) : <li className="text-slate-500">لا يوجد</li>}
-                                </ul>
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-blue-50/70 p-4 rounded-lg border border-blue-200/80">
+                                    <h4 className="font-bold text-blue-800 mb-2 border-b-2 border-blue-200 pb-2">سجل الإذن</h4>
+                                    <ul className="space-y-2 text-sm text-blue-900">
+                                        {studentData.permissionRecords.length > 0 ? studentData.permissionRecords.map(r => (
+                                            <li key={r.id}><strong>{r.date}</strong></li>
+                                        )) : <li className="text-slate-500">لا يوجد</li>}
+                                    </ul>
+                                </div>
+                                <div className="bg-yellow-50/70 p-4 rounded-lg border border-yellow-200/80">
+                                    <h4 className="font-bold text-yellow-800 mb-2 border-b-2 border-yellow-200 pb-2">سجل المرض</h4>
+                                    <ul className="space-y-2 text-sm text-yellow-900">
+                                        {studentData.sickRecords.length > 0 ? studentData.sickRecords.map(r => (
+                                            <li key={r.id}><strong>{r.date}</strong></li>
+                                        )) : <li className="text-slate-500">لا يوجد</li>}
+                                    </ul>
+                                </div>
                             </div>
-                            <div className="bg-blue-50/70 p-4 rounded-lg border border-blue-200/80">
-                                <h4 className="font-bold text-blue-800 mb-2 border-b-2 border-blue-200 pb-2">سجل الإذن</h4>
-                                <ul className="space-y-2 text-sm text-blue-900">
-                                    {studentData.permissionRecords.length > 0 ? studentData.permissionRecords.map(r => (
-                                        <li key={r.id}><strong>{r.date}</strong></li>
-                                    )) : <li className="text-slate-500">لا يوجد</li>}
-                                </ul>
-                            </div>
-                            <div className="bg-yellow-50/70 p-4 rounded-lg border border-yellow-200/80">
-                                <h4 className="font-bold text-yellow-800 mb-2 border-b-2 border-yellow-200 pb-2">سجل المرض</h4>
-                                <ul className="space-y-2 text-sm text-yellow-900">
-                                    {studentData.sickRecords.length > 0 ? studentData.sickRecords.map(r => (
-                                        <li key={r.id}><strong>{r.date}</strong></li>
-                                    )) : <li className="text-slate-500">لا يوجد</li>}
-                                </ul>
+                            <div>
+                                <h4 className="text-lg font-bold text-slate-700 mb-3">غياب</h4>
+                                <div className="overflow-x-auto border border-red-200 rounded-lg">
+                                    <table className="w-full text-sm text-right text-slate-600">
+                                        <thead className="text-xs text-red-800 uppercase bg-red-100">
+                                            <tr>
+                                                <th className="px-4 py-3">المادة الدراسية</th>
+                                                <th className="px-4 py-3">الغياب الأول</th>
+                                                <th className="px-4 py-3">الغياب الثاني</th>
+                                                <th className="px-4 py-3">الغياب الثالث</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {studentData.absenceDetailsByCourse.size > 0 ? (
+                                                Array.from(studentData.absenceDetailsByCourse.entries()).map(([course, dates]) => (
+                                                    <tr key={course} className="bg-white border-b border-red-100 last:border-b-0 hover:bg-red-50/50">
+                                                        <td className="px-4 py-3 font-semibold">{course}</td>
+                                                        <td className="px-4 py-3">{dates[0] || '-'}</td>
+                                                        <td className="px-4 py-3">{dates[1] || '-'}</td>
+                                                        <td className="px-4 py-3">{dates[2] || '-'}</td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={4} className="text-center py-6 text-slate-500">لا يوجد سجل غياب.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
