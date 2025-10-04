@@ -1,18 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DormitoryPermissionRecord, DormitoryRecapStatus, Dormitory } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
-
-const sampleDormitories: Dormitory[] = [
-    { id: 'd1', name: 'مبنى الشافعي' },
-    { id: 'd2', name: 'مبنى أحمد بن حنبل' },
-];
-
-const sampleRecords: DormitoryPermissionRecord[] = [
-  { id: 'r1', studentId: 's1', studentName: 'عبد الله عمر', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-20', status: DormitoryRecapStatus.IZIN_KELUAR, numberOfDays: 1, reason: 'شراء كتب' },
-  { id: 'r2', studentId: 's2', studentName: 'خالد بن الوليد', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-21', status: DormitoryRecapStatus.IZIN_PULANG, numberOfDays: 3, reason: 'زيارة الأهل' },
-  { id: 'r3', studentId: 's3', studentName: 'سلمان الفارسي', dormitoryId: 'd2', dormitoryName: 'مبنى أحمد بن حنبل', date: '2024-05-22', status: DormitoryRecapStatus.IZIN_KELUAR, numberOfDays: 1 },
-];
+import { supabase } from '../../supabaseClient';
 
 const statusColorMap: { [key in DormitoryRecapStatus]: string } = {
   [DormitoryRecapStatus.IZIN_KELUAR]: 'bg-blue-100 text-blue-800',
@@ -20,11 +10,57 @@ const statusColorMap: { [key in DormitoryRecapStatus]: string } = {
 };
 
 export const RecapView: React.FC = () => {
-    const [records, setRecords] = useState<DormitoryPermissionRecord[]>(sampleRecords);
+    const [records, setRecords] = useState<DormitoryPermissionRecord[]>([]);
+    const [dormitories, setDormitories] = useState<Dormitory[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    
+    async function fetchData() {
+        setLoading(true);
+        try {
+            const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
+            if (dormsError) throw dormsError;
+            setDormitories(dormsData || []);
+            const dormsMap = new Map((dormsData || []).map(d => [d.id, d.name]));
+
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('id, name, dormitoryId');
+            if (studentsError) throw studentsError;
+            const studentsMap = new Map((studentsData || []).map(s => [s.id, s]));
+
+            const { data: permissionsData, error: permissionsError } = await supabase.from('dormitory_permissions').select('*');
+            if (permissionsError) throw permissionsError;
+
+            const fetchedRecords = (permissionsData || []).map(p => {
+                const student = studentsMap.get(p.studentId);
+                const dormitoryName = student ? dormsMap.get(student.dormitoryId) : 'N/A';
+                return {
+                    id: p.id,
+                    studentId: p.studentId,
+                    studentName: student?.name || 'طالب محذوف',
+                    dormitoryId: student?.dormitoryId || '',
+                    dormitoryName: dormitoryName || 'N/A',
+                    date: p.date,
+                    status: p.type as DormitoryRecapStatus,
+                    numberOfDays: p.numberOfDays,
+                    reason: p.reason
+                };
+            }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            
+            setRecords(fetchedRecords);
+
+        } catch (error: any) {
+            alert(`فشل في جلب البيانات: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     const filteredRecords = useMemo(() => {
         return records.filter(record => {
@@ -37,9 +73,21 @@ export const RecapView: React.FC = () => {
         });
     }, [records, searchQuery, selectedDormitoryId, startDate, endDate]);
 
-    const deleteRecord = (id: string) => {
-        setRecords(prev => prev.filter(r => r.id !== id));
+    const deleteRecord = async (id: string) => {
+        if (!confirm('هل أنت متأكد أنك تريد الحذف؟')) return;
+
+        const { error } = await supabase.from('dormitory_permissions').delete().eq('id', id);
+        if (error) {
+            alert(`فشل الحذف: ${error.message}`);
+        } else {
+            alert('تم الحذف بنجاح.');
+            fetchData();
+        }
     };
+    
+    if (loading) {
+        return <div className="text-center p-8">...جاري تحميل البيانات</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -60,7 +108,7 @@ export const RecapView: React.FC = () => {
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
                         <option value="">كل المهاجع</option>
-                        {sampleDormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                     <input
                         type="date"

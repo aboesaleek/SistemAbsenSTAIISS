@@ -1,19 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Dormitory, Student, DormitoryPermissionType } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
+import { supabase } from '../../supabaseClient';
 
-// Sample data (in a real app, this would come from an API)
-const sampleDormitories: Dormitory[] = [
-    { id: 'd1', name: 'مبنى الشافعي' },
-    { id: 'd2', name: 'مبنى أحمد بن حنبل' },
-];
-
-const sampleStudents: Student[] = [
-    { id: 's1', name: 'عبد الله عمر', dormitoryId: 'd1' },
-    { id: 's2', name: 'خالد بن الوليد', dormitoryId: 'd1' },
-    { id: 's3', name: 'سلمان الفارسي', dormitoryId: 'd2' },
-    { id: 's4', name: 'أبو هريرة', dormitoryId: 'd2' },
-];
 
 export const PermissionsView: React.FC = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -25,17 +14,41 @@ export const PermissionsView: React.FC = () => {
     const [reason, setReason] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
 
+    const [dormitories, setDormitories] = useState<Dormitory[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
+                if (dormsError) throw dormsError;
+                setDormitories(dormsData || []);
+
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitoryId', 'is', null);
+                if (studentsError) throw studentsError;
+                setStudents(studentsData || []);
+            } catch (error: any) {
+                alert(`فشل في جلب البيانات: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchData();
+    }, []);
+
     const filteredStudentsByDormitory = useMemo(() => {
         if (!selectedDormitoryId) return [];
-        return sampleStudents.filter(s => s.dormitoryId === selectedDormitoryId);
-    }, [selectedDormitoryId]);
+        return students.filter(s => s.dormitoryId === selectedDormitoryId);
+    }, [selectedDormitoryId, students]);
 
     const searchedStudents = useMemo(() => {
         if (!searchQuery) return [];
-        return sampleStudents.filter(s => 
+        return students.filter(s => 
             s.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [searchQuery]);
+    }, [searchQuery, students]);
 
     useEffect(() => {
         setSelectedStudentId('');
@@ -50,28 +63,37 @@ export const PermissionsView: React.FC = () => {
         setShowSearchResults(false);
     };
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedStudentId || !date || !permissionType) {
             alert('يرجى ملء جميع الحقول المطلوبة.');
             return;
         }
-        console.log({
+        
+        const { error } = await supabase.from('dormitory_permissions').insert({
             studentId: selectedStudentId,
-            dormitoryId: selectedDormitoryId,
             date,
-            permissionType,
+            type: permissionType,
             numberOfDays,
             reason,
         });
-        alert('تم تسجيل الإذن بنجاح!');
-        // Reset form
-        setSearchQuery('');
-        setSelectedDormitoryId('');
-        setSelectedStudentId('');
-        setNumberOfDays(1);
-        setReason('');
+
+        if (error) {
+            alert(`فشل تسجيل الإذن: ${error.message}`);
+        } else {
+            alert('تم تسجيل الإذن بنجاح!');
+            // Reset form
+            setSearchQuery('');
+            setSelectedDormitoryId('');
+            setSelectedStudentId('');
+            setNumberOfDays(1);
+            setReason('');
+        }
     };
+
+    if (loading) {
+        return <div className="text-center p-8">...جاري تحميل البيانات</div>;
+    }
 
     return (
         <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
@@ -116,7 +138,7 @@ export const PermissionsView: React.FC = () => {
                                         className="p-3 hover:bg-purple-100 cursor-pointer"
                                         onClick={() => handleStudentSearchSelect(student)}
                                     >
-                                        {student.name} - <span className="text-sm text-slate-500">{sampleDormitories.find(d => d.id === student.dormitoryId)?.name}</span>
+                                        {student.name} - <span className="text-sm text-slate-500">{dormitories.find(d => d.id === student.dormitoryId)?.name}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -134,7 +156,7 @@ export const PermissionsView: React.FC = () => {
                             className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
                         >
                             <option value="">-- اختر المهجع --</option>
-                            {sampleDormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                     </div>
                     <div>

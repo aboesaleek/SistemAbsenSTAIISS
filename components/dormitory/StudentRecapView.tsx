@@ -1,23 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Dormitory, Student, DormitoryPermissionRecord, DormitoryRecapStatus } from '../../types';
-
-const sampleDormitories: Dormitory[] = [
-    { id: 'd1', name: 'مبنى الشافعي' },
-    { id: 'd2', name: 'مبنى أحمد بن حنبل' },
-];
-
-const sampleStudents: Student[] = [
-    { id: 's1', name: 'عبد الله عمر', dormitoryId: 'd1' },
-    { id: 's2', name: 'خالد بن الوليد', dormitoryId: 'd1' },
-    { id: 's3', name: 'سلمان الفارسي', dormitoryId: 'd2' },
-];
-
-const sampleRecords: DormitoryPermissionRecord[] = [
-  { id: 'r1', studentId: 's1', studentName: 'عبد الله عمر', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-20', status: DormitoryRecapStatus.IZIN_KELUAR, numberOfDays: 1, reason: 'شراء كتب' },
-  { id: 'r2', studentId: 's1', studentName: 'عبد الله عمر', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-22', status: DormitoryRecapStatus.IZIN_PULANG, numberOfDays: 3, reason: 'زيارة الأهل' },
-  { id: 'r3', studentId: 's2', studentName: 'خالد بن الوليد', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-21', status: DormitoryRecapStatus.IZIN_PULANG, numberOfDays: 2 },
-  { id: 'r4', studentId: 's3', studentName: 'سلمان الفارسي', dormitoryId: 'd2', dormitoryName: 'مبنى أحمد بن حنبل', date: '2024-05-23', status: DormitoryRecapStatus.IZIN_KELUAR, numberOfDays: 1 },
-];
+import { supabase } from '../../supabaseClient';
 
 const StatCard: React.FC<{ label: string; value: number; gradient: string }> = ({ label, value, gradient }) => (
     <div className={`text-white p-4 rounded-xl shadow-lg bg-gradient-to-br ${gradient}`}>
@@ -28,6 +11,16 @@ const StatCard: React.FC<{ label: string; value: number; gradient: string }> = (
 
 const DonutChart: React.FC<{ data: { label: string; value: number; color: string; bgColor: string }[] }> = ({ data }) => {
     const total = data.reduce((acc, item) => acc + item.value, 0);
+
+    if (total === 0) {
+       return (
+         <div className="w-full flex flex-col items-center justify-center bg-slate-50/80 p-6 rounded-xl border border-slate-200/60 min-h-[316px]">
+            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">ملخص الأذونات</h4>
+            <p className="text-slate-500">لا توجد بيانات لعرضها.</p>
+        </div>
+       )
+    }
+
     const radius = 15.9155;
     const circumference = 2 * Math.PI * radius;
     let accumulatedPercent = 0;
@@ -81,22 +74,53 @@ export const StudentRecapView: React.FC = () => {
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
+    
+    const [dormitories, setDormitories] = useState<Dormitory[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [allRecords, setAllRecords] = useState<DormitoryPermissionRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
+                if (dormsError) throw dormsError;
+                setDormitories(dormsData || []);
+
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitoryId', 'is', null);
+                if (studentsError) throw studentsError;
+                setStudents(studentsData || []);
+                
+                const { data: permissionsData, error: permissionsError } = await supabase.from('dormitory_permissions').select('*');
+                if (permissionsError) throw permissionsError;
+                
+                setAllRecords(permissionsData || []);
+
+            } catch (error: any) {
+                alert(`فشل في جلب البيانات: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchData();
+    }, []);
 
     const studentData = useMemo(() => {
         if (!selectedStudentId) return null;
-        const records = sampleRecords.filter(r => r.studentId === selectedStudentId);
+        const records = allRecords.filter(r => r.studentId === selectedStudentId);
         const izinKeluarRecords = records.filter(r => r.status === DormitoryRecapStatus.IZIN_KELUAR);
         const izinPulangRecords = records.filter(r => r.status === DormitoryRecapStatus.IZIN_PULANG);
         const uniqueDays = new Set(records.map(r => r.date)).size;
-        return { izinKeluarRecords, izinPulangRecords, uniqueDays, allRecords: records };
-    }, [selectedStudentId]);
+        return { izinKeluarRecords, izinPulangRecords, uniqueDays, allRecords: records.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) };
+    }, [selectedStudentId, allRecords]);
 
     const searchedStudents = useMemo(() => {
         if (!searchQuery) return [];
-        return sampleStudents.filter(s =>
+        return students.filter(s =>
             s.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [searchQuery]);
+    }, [searchQuery, students]);
     
     const handleStudentSearchSelect = (student: Student) => {
         setSearchQuery(student.name);
@@ -107,6 +131,10 @@ export const StudentRecapView: React.FC = () => {
         }, 0);
         setShowSearchResults(false);
     };
+
+    if (loading) {
+        return <div className="text-center p-8">...جاري تحميل البيانات</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -135,7 +163,7 @@ export const StudentRecapView: React.FC = () => {
                                         className="p-3 hover:bg-purple-100 cursor-pointer"
                                         onClick={() => handleStudentSearchSelect(student)}
                                     >
-                                        {student.name} - <span className="text-sm text-slate-500">{sampleDormitories.find(d => d.id === student.dormitoryId)?.name}</span>
+                                        {student.name} - <span className="text-sm text-slate-500">{dormitories.find(d => d.id === student.dormitoryId)?.name}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -147,7 +175,7 @@ export const StudentRecapView: React.FC = () => {
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
                         <option value="">-- اختر المهجع --</option>
-                        {sampleDormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                     <select
                         value={selectedStudentId}
@@ -156,7 +184,7 @@ export const StudentRecapView: React.FC = () => {
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100"
                     >
                         <option value="">-- اختر الطالب --</option>
-                        {sampleStudents.filter(s => s.dormitoryId === selectedDormitoryId).map(s => (
+                        {students.filter(s => s.dormitoryId === selectedDormitoryId).map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
@@ -166,7 +194,7 @@ export const StudentRecapView: React.FC = () => {
             {studentData && (
                 <div className="space-y-6">
                     <div className="p-6 bg-white rounded-2xl shadow-lg border">
-                        <h3 className="text-2xl font-bold text-slate-800 mb-4">{sampleStudents.find(s=>s.id === selectedStudentId)?.name}</h3>
+                        <h3 className="text-2xl font-bold text-slate-800 mb-4">{students.find(s=>s.id === selectedStudentId)?.name}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                              <div className="flex flex-col justify-between space-y-4">
                                 <div className="text-center p-6 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl shadow-xl">

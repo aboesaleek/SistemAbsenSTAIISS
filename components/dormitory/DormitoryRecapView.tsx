@@ -1,28 +1,58 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { DormitoryPermissionRecord, DormitoryRecapStatus, Dormitory, DormitoryStudentRecapData } from '../../types';
 import { PrinterIcon } from '../icons/PrinterIcon';
-
-// Sample data
-const sampleDormitories: Dormitory[] = [
-    { id: 'd1', name: 'مبنى الشافعي' },
-    { id: 'd2', name: 'مبنى أحمد بن حنبل' },
-];
-
-const sampleRecords: DormitoryPermissionRecord[] = [
-  { id: 'r1', studentId: 's1', studentName: 'عبد الله عمر', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-20', status: DormitoryRecapStatus.IZIN_KELUAR, numberOfDays: 1 },
-  { id: 'r2', studentId: 's2', studentName: 'خالد بن الوليد', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-21', status: DormitoryRecapStatus.IZIN_PULANG, numberOfDays: 3 },
-  { id: 'r3', studentId: 's1', studentName: 'عبد الله عمر', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-22', status: DormitoryRecapStatus.IZIN_PULANG, numberOfDays: 2 },
-  { id: 'r4', studentId: 's3', studentName: 'سلمان الفارسي', dormitoryId: 'd2', dormitoryName: 'مبنى أحمد بن حنبل', date: '2024-05-22', status: DormitoryRecapStatus.IZIN_KELUAR, numberOfDays: 1 },
-  { id: 'r5', studentId: 's1', studentName: 'عبد الله عمر', dormitoryId: 'd1', dormitoryName: 'مبنى الشافعي', date: '2024-05-22', status: DormitoryRecapStatus.IZIN_KELUAR, numberOfDays: 1 },
-];
+import { supabase } from '../../supabaseClient';
 
 export const DormitoryRecapView: React.FC = () => {
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
+    const [dormitories, setDormitories] = useState<Dormitory[]>([]);
+    const [allRecords, setAllRecords] = useState<DormitoryPermissionRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    async function fetchData() {
+        setLoading(true);
+        try {
+            const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
+            if (dormsError) throw dormsError;
+            setDormitories(dormsData || []);
+
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('id, name, dormitoryId');
+            if (studentsError) throw studentsError;
+            const studentsMap = new Map((studentsData || []).map(s => [s.id, s]));
+
+            const { data: permissionsData, error: permissionsError } = await supabase.from('dormitory_permissions').select('*');
+            if (permissionsError) throw permissionsError;
+
+            const fetchedRecords = (permissionsData || []).map(p => {
+                const student = studentsMap.get(p.studentId);
+                return {
+                    id: p.id,
+                    studentId: p.studentId,
+                    studentName: student?.name || 'طالب محذوف',
+                    dormitoryId: student?.dormitoryId || '',
+                    dormitoryName: '',
+                    date: p.date,
+                    status: p.type as DormitoryRecapStatus,
+                    numberOfDays: p.numberOfDays
+                };
+            });
+            
+            setAllRecords(fetchedRecords);
+        } catch (error: any) {
+            alert(`فشل في جلب البيانات: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     const dormitoryRecapData = useMemo((): DormitoryStudentRecapData[] => {
         if (!selectedDormitoryId) return [];
 
-        const dormitoryRecords = sampleRecords.filter(r => r.dormitoryId === selectedDormitoryId);
+        const dormitoryRecords = allRecords.filter(r => r.dormitoryId === selectedDormitoryId);
         const studentDataMap = new Map<string, DormitoryStudentRecapData>();
 
         for (const record of dormitoryRecords) {
@@ -48,8 +78,19 @@ export const DormitoryRecapView: React.FC = () => {
             data.uniqueDays = uniqueDates.size;
         });
 
-        return Array.from(studentDataMap.values());
-    }, [selectedDormitoryId]);
+        return Array.from(studentDataMap.values()).sort((a,b) => a.studentName.localeCompare(b.studentName));
+    }, [selectedDormitoryId, allRecords]);
+    
+    if (loading && !selectedDormitoryId) {
+        return (
+         <div className="space-y-6">
+            <h2 className="text-3xl font-bold text-slate-800">ملخص المهجع</h2>
+             <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                <div className="text-center p-8">...جاري تحميل البيانات</div>
+             </div>
+        </div>
+       )
+    }
 
     return (
         <div className="space-y-6">
@@ -66,7 +107,7 @@ export const DormitoryRecapView: React.FC = () => {
                             className="w-full md:w-80 p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500"
                         >
                             <option value="">-- اختر لعرض البيانات --</option>
-                            {sampleDormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                     </div>
                     {selectedDormitoryId && (
@@ -81,8 +122,9 @@ export const DormitoryRecapView: React.FC = () => {
             {selectedDormitoryId && (
                 <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
                     <h3 className="text-xl font-bold text-slate-700 mb-4">
-                        ملخص {sampleDormitories.find(d => d.id === selectedDormitoryId)?.name}
+                        ملخص {dormitories.find(d => d.id === selectedDormitoryId)?.name}
                     </h3>
+                    {loading ? <div className="text-center p-8">...جاري تحديث البيانات</div> : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-right text-slate-600">
                             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
@@ -110,6 +152,7 @@ export const DormitoryRecapView: React.FC = () => {
                             <p className="text-center text-slate-500 py-8">لا توجد سجلات أذونات لهذا المهجع.</p>
                         )}
                     </div>
+                    )}
                 </div>
             )}
         </div>

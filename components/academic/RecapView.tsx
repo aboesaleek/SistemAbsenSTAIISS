@@ -1,23 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AttendanceRecord, RecapStatus, Class } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
+import { supabase } from '../../supabaseClient';
 
-// Sample data (in a real app, this would come from an API)
-const sampleClasses: Class[] = [
-    { id: 'c1', name: 'الفصل الأول' },
-    { id: 'c2', name: 'الفصل الثاني' },
-    { id: 'c3', name: 'الفصل الثالث' },
-];
-
-const sampleRecords: AttendanceRecord[] = [
-  { id: 'r1', studentId: 's1', studentName: 'أحمد علي', classId: 'c1', className: 'الفصل الأول', date: '2024-05-20', status: RecapStatus.ABSENT },
-  { id: 'r2', studentId: 's2', studentName: 'فاطمة محمد', classId: 'c1', className: 'الفصل الأول', date: '2024-05-20', status: RecapStatus.SICK },
-  { id: 'r3', studentId: 's3', studentName: 'يوسف حسن', classId: 'c2', className: 'الفصل الثاني', date: '2024-05-21', status: RecapStatus.ABSENT },
-  { id: 'r4', studentId: 's1', studentName: 'أحمد علي', classId: 'c1', className: 'الفصل الأول', date: '2024-05-22', status: RecapStatus.PERMISSION },
-  { id: 'r5', studentId: 's4', studentName: 'عائشة عبد الله', classId: 'c2', className: 'الفصل الثاني', date: '2024-05-22', status: RecapStatus.ABSENT },
-  { id: 'r6', studentId: 's5', studentName: 'عمر خالد', classId: 'c3', className: 'الفصل الثالث', date: '2024-05-23', status: RecapStatus.SICK },
-];
+// Local type for combined record
+interface CombinedRecord extends AttendanceRecord {
+    sourceId: string;
+    sourceType: 'permission' | 'absence';
+}
 
 const statusColorMap: { [key in RecapStatus]: string } = {
   [RecapStatus.ABSENT]: 'bg-red-100 text-red-800',
@@ -26,11 +17,86 @@ const statusColorMap: { [key in RecapStatus]: string } = {
 };
 
 export const RecapView: React.FC = () => {
-    const [records, setRecords] = useState<AttendanceRecord[]>(sampleRecords);
+    const [records, setRecords] = useState<CombinedRecord[]>([]);
+    const [classes, setClasses] = useState<Class[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+
+    async function fetchData() {
+        setLoading(true);
+        try {
+            const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
+            if (classesError) throw classesError;
+            setClasses(classesData || []);
+
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*');
+            if (studentsError) throw studentsError;
+            
+            const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
+            if (coursesError) throw coursesError;
+
+            const { data: permissionsData, error: permissionsError } = await supabase.from('academic_permissions').select('*');
+            if (permissionsError) throw permissionsError;
+
+            const { data: absencesData, error: absencesError } = await supabase.from('academic_absences').select('*');
+            if (absencesError) throw absencesError;
+            
+            const studentsMap = new Map(studentsData.map(s => [s.id, s]));
+            const classesMap = new Map(classesData.map(c => [c.id, c]));
+            const coursesMap = new Map(coursesData.map(c => [c.id, c]));
+
+            const combined: CombinedRecord[] = [];
+
+            (permissionsData || []).forEach(p => {
+                const student = studentsMap.get(p.studentId);
+                if (!student) return;
+                const studentClass = classesMap.get(student.classId);
+                combined.push({
+                    id: `p-${p.id}`,
+                    sourceId: p.id,
+                    sourceType: 'permission',
+                    studentId: p.studentId,
+                    studentName: student.name,
+                    classId: student.classId || '',
+                    className: studentClass?.name || 'N/A',
+                    date: p.date,
+                    status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
+                });
+            });
+
+            (absencesData || []).forEach(a => {
+                const student = studentsMap.get(a.studentId);
+                if (!student) return;
+                const studentClass = classesMap.get(student.classId);
+                const course = coursesMap.get(a.courseId);
+                combined.push({
+                    id: `a-${a.id}`,
+                    sourceId: a.id,
+                    sourceType: 'absence',
+                    studentId: a.studentId,
+                    studentName: student.name,
+                    classId: student.classId || '',
+                    className: studentClass?.name || 'N/A',
+                    date: a.date,
+                    status: RecapStatus.ABSENT,
+                    courseName: course?.name,
+                });
+            });
+            
+            setRecords(combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        } catch (error: any) {
+             alert(`فشل في جلب البيانات: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     const filteredRecords = useMemo(() => {
         return records.filter(record => {
@@ -43,9 +109,23 @@ export const RecapView: React.FC = () => {
         });
     }, [records, searchQuery, selectedClassId, startDate, endDate]);
 
-    const deleteRecord = (id: string) => {
-        setRecords(prev => prev.filter(r => r.id !== id));
+    const deleteRecord = async (record: CombinedRecord) => {
+        if (!confirm('هل أنت متأكد أنك تريد الحذف؟')) return;
+        
+        const tableName = record.sourceType === 'permission' ? 'academic_permissions' : 'academic_absences';
+        const { error } = await supabase.from(tableName).delete().eq('id', record.sourceId);
+
+        if (error) {
+            alert(`فشل الحذف: ${error.message}`);
+        } else {
+            alert('تم الحذف بنجاح.');
+            fetchData(); // Refresh data
+        }
     };
+    
+    if (loading) {
+        return <div className="text-center p-8">...جاري تحميل البيانات</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -66,7 +146,7 @@ export const RecapView: React.FC = () => {
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
                         <option value="">كل الفصول</option>
-                        {sampleClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                     <input
                         type="date"
@@ -113,7 +193,7 @@ export const RecapView: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800">
+                                        <button onClick={() => deleteRecord(record)} className="text-red-600 hover:text-red-800">
                                             <DeleteIcon className="w-5 h-5" />
                                         </button>
                                     </td>

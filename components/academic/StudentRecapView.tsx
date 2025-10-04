@@ -1,26 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Class, Student, AttendanceRecord, RecapStatus } from '../../types';
-
-// Data sampel (akan diambil dari API di aplikasi nyata)
-const sampleClasses: Class[] = [
-    { id: 'c1', name: 'الفصل الأول' },
-    { id: 'c2', name: 'الفصل الثاني' },
-];
-
-const sampleStudents: Student[] = [
-    { id: 's1', name: 'أحمد علي', classId: 'c1' },
-    { id: 's2', name: 'فاطمة محمد', classId: 'c1' },
-    { id: 's3', name: 'يوسف حسن', classId: 'c2' },
-];
-
-const sampleRecords: AttendanceRecord[] = [
-  { id: 'r1', studentId: 's1', studentName: 'أحمد علي', classId: 'c1', className: 'الفصل الأول', date: '2024-05-20', status: RecapStatus.ABSENT, courseName: 'الرياضيات' },
-  { id: 'r2', studentId: 's1', studentName: 'أحمد علي', classId: 'c1', className: 'الفصل الأول', date: '2024-05-22', status: RecapStatus.PERMISSION },
-  { id: 'r3', studentId: 's1', studentName: 'أحمد علي', classId: 'c1', className: 'الفصل الأول', date: '2024-05-23', status: RecapStatus.SICK },
-  { id: 'r4', studentId: 's1', studentName: 'أحمد علي', classId: 'c1', className: 'الفصل الأول', date: '2024-05-25', status: RecapStatus.ABSENT, courseName: 'الفيزياء' },
-  { id: 'r5', studentId: 's2', studentName: 'فاطمة محمد', classId: 'c1', className: 'الفصل الأول', date: '2024-05-20', status: RecapStatus.SICK },
-  { id: 'r6', studentId: 's3', studentName: 'يوسف حسن', classId: 'c2', className: 'الفصل الثاني', date: '2024-05-21', status: RecapStatus.ABSENT, courseName: 'الكيمياء' },
-];
+import { supabase } from '../../supabaseClient';
 
 const StatCard: React.FC<{ label: string; value: number; gradient: string }> = ({ label, value, gradient }) => (
     <div className={`text-white p-4 rounded-xl shadow-lg bg-gradient-to-br ${gradient}`}>
@@ -31,6 +11,14 @@ const StatCard: React.FC<{ label: string; value: number; gradient: string }> = (
 
 const DonutChart: React.FC<{ data: { label: string; value: number; color: string; bgColor: string }[] }> = ({ data }) => {
     const total = data.reduce((acc, item) => acc + item.value, 0);
+    if (total === 0) {
+       return (
+         <div className="w-full flex flex-col items-center justify-center bg-slate-50/80 p-6 rounded-xl border border-slate-200/60 min-h-[316px]">
+            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">ملخص الغياب</h4>
+            <p className="text-slate-500">لا توجد بيانات لعرضها.</p>
+        </div>
+       )
+    }
     const radius = 15.9155;
     const circumference = 2 * Math.PI * radius;
     let accumulatedPercent = 0;
@@ -84,22 +72,91 @@ export const StudentRecapView: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
+    
+    const [classes, setClasses] = useState<Class[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [allRecords, setAllRecords] = useState<AttendanceRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
+                if (classesError) throw classesError;
+                setClasses(classesData || []);
+
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('classId', 'is', null);
+                if (studentsError) throw studentsError;
+                setStudents(studentsData || []);
+                
+                const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
+                if (coursesError) throw coursesError;
+                const coursesMap = new Map((coursesData || []).map(c => [c.id, c.name]));
+
+                const { data: permissionsData, error: permissionsError } = await supabase.from('academic_permissions').select('*');
+                if (permissionsError) throw permissionsError;
+
+                const { data: absencesData, error: absencesError } = await supabase.from('academic_absences').select('*');
+                if (absencesError) throw absencesError;
+                
+                const combined: AttendanceRecord[] = [];
+
+                (permissionsData || []).forEach(p => {
+                    combined.push({
+                        id: `p-${p.id}`,
+                        studentId: p.studentId,
+                        studentName: '', className: '', classId: '',
+                        date: p.date,
+                        status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
+                    });
+                });
+
+                (absencesData || []).forEach(a => {
+                    combined.push({
+                        id: `a-${a.id}`,
+                        studentId: a.studentId,
+                        studentName: '', className: '', classId: '',
+                        date: a.date,
+                        status: RecapStatus.ABSENT,
+                        courseName: coursesMap.get(a.courseId) || 'غير معروف',
+                    });
+                });
+                
+                setAllRecords(combined);
+            } catch (error: any) {
+                alert(`فشل في جلب البيانات: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchData();
+    }, []);
 
     const studentData = useMemo(() => {
         if (!selectedStudentId) return null;
-        const records = sampleRecords.filter(r => r.studentId === selectedStudentId);
+        const records = allRecords.filter(r => r.studentId === selectedStudentId);
         const absentRecords = records.filter(r => r.status === RecapStatus.ABSENT);
         const permissionRecords = records.filter(r => r.status === RecapStatus.PERMISSION);
         const sickRecords = records.filter(r => r.status === RecapStatus.SICK);
         const uniqueDays = new Set(records.map(r => r.date)).size;
         return { absentRecords, permissionRecords, sickRecords, uniqueDays };
-    }, [selectedStudentId]);
-    
-    const handleStudentSelect = (student: Student) => {
-        setSearchQuery(student.name);
-        setSelectedClassId(student.classId || '');
-        setTimeout(() => setSelectedStudentId(student.id), 0);
-    };
+    }, [selectedStudentId, allRecords]);
+
+    const filteredStudents = useMemo(() => {
+        let result = students;
+        if (selectedClassId) {
+            result = result.filter(s => s.classId === selectedClassId);
+        }
+        if (searchQuery) {
+            result = result.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+        return result;
+    }, [students, selectedClassId, searchQuery]);
+
+    if (loading) {
+        return <div className="text-center p-8">...جاري تحميل البيانات</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -120,16 +177,16 @@ export const StudentRecapView: React.FC = () => {
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
                         <option value="">-- اختر الفصل --</option>
-                        {sampleClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                     <select
                         value={selectedStudentId}
                         onChange={e => setSelectedStudentId(e.target.value)}
-                        disabled={!selectedClassId}
+                        disabled={filteredStudents.length === 0}
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100"
                     >
                         <option value="">-- اختر الطالب --</option>
-                        {sampleStudents.filter(s => s.classId === selectedClassId).map(s => (
+                        {filteredStudents.map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
@@ -139,7 +196,7 @@ export const StudentRecapView: React.FC = () => {
             {studentData && (
                 <div className="space-y-6">
                     <div className="p-6 bg-white rounded-2xl shadow-lg border">
-                        <h3 className="text-2xl font-bold text-slate-800 mb-4">{sampleStudents.find(s=>s.id === selectedStudentId)?.name}</h3>
+                        <h3 className="text-2xl font-bold text-slate-800 mb-4">{students.find(s=>s.id === selectedStudentId)?.name}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="flex flex-col justify-between space-y-4">
                                 <div className="text-center p-6 bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-xl shadow-xl">

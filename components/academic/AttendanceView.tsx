@@ -1,22 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Class, Student } from '../../types';
+import { Class, Student, Course } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
-
-// Sample data (in a real app, this would come from an API)
-const sampleClasses: Class[] = [
-    { id: 'c1', name: 'الفصل الأول' },
-    { id: 'c2', name: 'الفصل الثاني' },
-    { id: 'c3', name: 'الفصل الثالث' },
-];
-
-const sampleStudents: Student[] = [
-    { id: 's1', name: 'أحمد علي', classId: 'c1' },
-    { id: 's2', name: 'فاطمة محمد', classId: 'c1' },
-    { id: 's3', name: 'يوسف حسن', classId: 'c2' },
-    { id: 's4', name: 'عائشة عبد الله', classId: 'c2' },
-    { id: 's5', name: 'عمر خالد', classId: 'c3' },
-    { id: 's6', name: 'مريم سعيد', classId: 'c3' },
-];
+import { supabase } from '../../supabaseClient';
 
 const TodaySummary: React.FC = () => (
     <div className="text-center p-8 bg-teal-50 border border-teal-200 rounded-lg mb-8">
@@ -30,21 +15,52 @@ export const AttendanceView: React.FC = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
+    const [selectedCourseId, setSelectedCourseId] = useState('');
     const [markedAsAbsent, setMarkedAsAbsent] = useState<Set<string>>(new Set());
     const [interactionStarted, setInteractionStarted] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
+    
+    const [classes, setClasses] = useState<Class[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [courses, setCourses] = useState<Course[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
+                if (classesError) throw classesError;
+                setClasses(classesData || []);
+
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('classId', 'is', null);
+                if (studentsError) throw studentsError;
+                setStudents(studentsData || []);
+                
+                const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
+                if (coursesError) throw coursesError;
+                setCourses(coursesData || []);
+
+            } catch (error: any) {
+                alert(`فشل في جلب البيانات: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchData();
+    }, []);
 
     const filteredStudents = useMemo(() => {
         if (!selectedClassId) return [];
-        return sampleStudents.filter(s => s.classId === selectedClassId);
-    }, [selectedClassId]);
+        return students.filter(s => s.classId === selectedClassId);
+    }, [selectedClassId, students]);
 
     const searchedStudents = useMemo(() => {
         if (!searchQuery) return [];
-        return sampleStudents.filter(s => 
+        return students.filter(s => 
             s.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [searchQuery]);
+    }, [searchQuery, students]);
     
     useEffect(() => {
       if (searchQuery || selectedClassId) {
@@ -56,7 +72,6 @@ export const AttendanceView: React.FC = () => {
         setSearchQuery(student.name);
         setSelectedClassId(student.classId || '');
         setShowSearchResults(false);
-        // In a real app, you might want to scroll to the student in the list
     };
     
     const toggleAbsent = (studentId: string) => {
@@ -71,32 +86,49 @@ export const AttendanceView: React.FC = () => {
         });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (markedAsAbsent.size === 0) {
             alert('لم تحدد أي طالب كـ "غائب".');
             return;
         }
+        if (!selectedCourseId) {
+            alert('يرجى اختيار المادة الدراسية.');
+            return;
+        }
+        
         const absenceData = Array.from(markedAsAbsent).map(studentId => ({
             studentId,
             date,
+            courseId: selectedCourseId,
         }));
-        console.log("Saving absence data:", absenceData);
-        alert(`تم تسجيل غياب ${absenceData.length} طالب بنجاح.`);
-        // Reset state after submission
-        setMarkedAsAbsent(new Set());
-        setSelectedClassId('');
-        setSearchQuery('');
-        setInteractionStarted(false);
+
+        const { error } = await supabase.from('academic_absences').insert(absenceData);
+
+        if (error) {
+            alert(`فشل تسجيل الغياب: ${error.message}`);
+        } else {
+            alert(`تم تسجيل غياب ${absenceData.length} طالب بنجاح.`);
+            // Reset state after submission
+            setMarkedAsAbsent(new Set());
+            setSelectedClassId('');
+            setSelectedCourseId('');
+            setSearchQuery('');
+            setInteractionStarted(false);
+        }
     };
+
+    if (loading) {
+        return <div className="text-center p-8">...جاري تحميل البيانات</div>;
+    }
 
     return (
         <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
             <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">تسجيل الحضور والغياب</h2>
             
             {/* Search and Filter Controls */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="md:col-span-2 relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="relative">
                     <label htmlFor="student-search" className="block text-sm font-semibold text-slate-700 mb-2">بحث عن طالب</label>
                     <input 
                         type="text"
@@ -112,7 +144,7 @@ export const AttendanceView: React.FC = () => {
                         <ul className="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-lg">
                             {searchedStudents.map(student => (
                                 <li key={student.id} className="p-3 hover:bg-teal-100 cursor-pointer" onClick={() => handleStudentSearchSelect(student)}>
-                                    {student.name} - <span className="text-sm text-slate-500">{sampleClasses.find(c => c.id === student.classId)?.name}</span>
+                                    {student.name} - <span className="text-sm text-slate-500">{classes.find(c => c.id === student.classId)?.name}</span>
                                 </li>
                             ))}
                         </ul>
@@ -126,12 +158,21 @@ export const AttendanceView: React.FC = () => {
                     </div>
                 </div>
             </div>
-             <div>
-                <label htmlFor="class-select" className="block text-sm font-semibold text-slate-700 mb-2">الفصل الدراسي</label>
-                <select id="class-select" value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500">
-                    <option value="">-- اختر الفصل لعرض الطلاب --</option>
-                    {sampleClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label htmlFor="class-select" className="block text-sm font-semibold text-slate-700 mb-2">الفصل الدراسي</label>
+                    <select id="class-select" value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500">
+                        <option value="">-- اختر الفصل لعرض الطلاب --</option>
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="course-select" className="block text-sm font-semibold text-slate-700 mb-2">المادة الدراسية</label>
+                    <select id="course-select" value={selectedCourseId} onChange={e => setSelectedCourseId(e.target.value)} className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500">
+                        <option value="">-- اختر المادة --</option>
+                        {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                </div>
             </div>
 
             <div className="mt-8">
@@ -139,7 +180,7 @@ export const AttendanceView: React.FC = () => {
                     <form onSubmit={handleSubmit}>
                         {filteredStudents.length > 0 ? (
                             <div className="space-y-3">
-                                <h3 className="text-xl font-bold text-slate-700 mb-4">قائمة طلاب {sampleClasses.find(c => c.id === selectedClassId)?.name}</h3>
+                                <h3 className="text-xl font-bold text-slate-700 mb-4">قائمة طلاب {classes.find(c => c.id === selectedClassId)?.name}</h3>
                                 {filteredStudents.map(student => (
                                     <div key={student.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                                         <span className="font-semibold text-slate-800">{student.name}</span>
