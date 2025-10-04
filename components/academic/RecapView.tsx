@@ -17,7 +17,11 @@ const statusColorMap: { [key in RecapStatus]: string } = {
   [RecapStatus.PERMISSION]: 'bg-blue-100 text-blue-800',
 };
 
-export const RecapView: React.FC = () => {
+interface RecapViewProps {
+  onStudentSelect: (studentId: string) => void;
+}
+
+export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
     const [records, setRecords] = useState<CombinedRecord[]>([]);
     const [classes, setClasses] = useState<Class[]>([]);
     const [loading, setLoading] = useState(true);
@@ -183,7 +187,11 @@ export const RecapView: React.FC = () => {
                             {filteredRecords.map((record, index) => (
                                 <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
                                     <td className="px-6 py-4">{index + 1}</td>
-                                    <td className="px-6 py-4 font-semibold">{record.studentName}</td>
+                                    <td className="px-6 py-4 font-semibold">
+                                      <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
+                                          {record.studentName}
+                                      </button>
+                                    </td>
                                     <td className="px-6 py-4">{record.className}</td>
                                     <td className="px-6 py-4">{record.date}</td>
                                     <td className="px-6 py-4">

@@ -4,7 +4,11 @@ import { AttendanceRecord, RecapStatus, Class, StudentRecapData, Student } from 
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { supabase } from '../../supabaseClient';
 
-export const ClassRecapView: React.FC = () => {
+interface ClassRecapViewProps {
+  onStudentSelect: (studentId: string) => void;
+}
+
+export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect }) => {
     const [selectedClassId, setSelectedClassId] = useState('');
     const [classes, setClasses] = useState<Class[]>([]);
     const [allRecords, setAllRecords] = useState<AttendanceRecord[]>([]);
@@ -165,7 +169,11 @@ export const ClassRecapView: React.FC = () => {
                             <tbody>
                                 {classRecapData.map(data => (
                                     <tr key={data.studentId} className="bg-white border-b hover:bg-slate-50">
-                                        <td className="px-6 py-4 font-semibold">{data.studentName}</td>
+                                        <td className="px-6 py-4 font-semibold">
+                                          <button onClick={() => onStudentSelect(data.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
+                                              {data.studentName}
+                                          </button>
+                                        </td>
                                         <td className="px-6 py-4">{data.absentCount}</td>
                                         <td className="px-6 py-4">{data.permissionCount}</td>
                                         <td className="px-6 py-4">{data.sickCount}</td>

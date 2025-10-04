@@ -68,11 +68,14 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
     );
 };
 
+interface StudentRecapViewProps {
+  preselectedStudentId?: string | null;
+}
 
-export const StudentRecapView: React.FC = () => {
+export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedStudentId }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
-    const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [selectedStudentId, setSelectedStudentId] = useState(preselectedStudentId || '');
     
     const [classes, setClasses] = useState<Class[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -134,6 +137,16 @@ export const StudentRecapView: React.FC = () => {
         }
         fetchData();
     }, []);
+
+    useEffect(() => {
+      if (preselectedStudentId && students.length > 0) {
+        const student = students.find(s => s.id === preselectedStudentId);
+        if (student) {
+          setSelectedClassId(student.class_id || '');
+          setSelectedStudentId(student.id);
+        }
+      }
+    }, [preselectedStudentId, students]);
 
     const studentData = useMemo(() => {
         if (!selectedStudentId) return null;

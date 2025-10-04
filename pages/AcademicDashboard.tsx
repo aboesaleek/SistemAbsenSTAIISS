@@ -21,6 +21,12 @@ interface AcademicDashboardProps {
 
 export const AcademicDashboard: React.FC<AcademicDashboardProps> = ({ onLogout }) => {
   const [currentView, setCurrentView] = useState<AcademicViewType>('home');
+  const [selectedStudentIdForRecap, setSelectedStudentIdForRecap] = useState<string | null>(null);
+
+  const handleStudentSelectForRecap = (studentId: string) => {
+    setSelectedStudentIdForRecap(studentId);
+    setCurrentView('studentRecap');
+  };
 
   const renderView = () => {
     switch (currentView) {
@@ -29,13 +35,13 @@ export const AcademicDashboard: React.FC<AcademicDashboardProps> = ({ onLogout }
       case 'permissions':
         return <PermissionsView />;
       case 'attendance':
-        return <AttendanceView />;
+        return <AttendanceView onStudentSelect={handleStudentSelectForRecap} />;
       case 'recap':
-        return <RecapView />;
+        return <RecapView onStudentSelect={handleStudentSelectForRecap} />;
       case 'classRecap':
-        return <ClassRecapView />;
+        return <ClassRecapView onStudentSelect={handleStudentSelectForRecap} />;
       case 'studentRecap':
-        return <StudentRecapView />;
+        return <StudentRecapView preselectedStudentId={selectedStudentIdForRecap} />;
       default:
         return <AcademicHomeView navigateTo={setCurrentView} />;
     }
@@ -58,7 +64,7 @@ export const AcademicDashboard: React.FC<AcademicDashboardProps> = ({ onLogout }
     },
     {
       id: 'attendance',
-      label: 'الحضور والغياب',
+      label: 'الحاضر والغياب',
       icon: <ClipboardListIcon className="w-6 h-6" />,
       isActive: currentView === 'attendance',
       onClick: () => setCurrentView('attendance'),

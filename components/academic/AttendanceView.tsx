@@ -9,7 +9,12 @@ const statusColorMap: { [key in RecapStatus]: string } = {
   [RecapStatus.PERMISSION]: 'bg-blue-100 text-blue-800',
 };
 
-const TodayRecordsTable: React.FC<{ records: AttendanceRecord[] }> = ({ records }) => {
+interface TodayRecordsTableProps {
+  records: AttendanceRecord[];
+  onStudentSelect: (studentId: string) => void;
+}
+
+const TodayRecordsTable: React.FC<TodayRecordsTableProps> = ({ records, onStudentSelect }) => {
     if (records.length === 0) {
         return (
             <div className="text-center p-8 bg-slate-50 border border-slate-200 rounded-lg mb-8">
@@ -35,7 +40,11 @@ const TodayRecordsTable: React.FC<{ records: AttendanceRecord[] }> = ({ records 
                     <tbody className="bg-white">
                         {records.map((record) => (
                             <tr key={record.id} className="border-b hover:bg-slate-50">
-                                <td className="px-6 py-4 font-semibold">{record.studentName}</td>
+                                <td className="px-6 py-4 font-semibold">
+                                    <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
+                                        {record.studentName}
+                                    </button>
+                                </td>
                                 <td className="px-6 py-4">{record.className}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColorMap[record.status]}`}>
@@ -52,8 +61,11 @@ const TodayRecordsTable: React.FC<{ records: AttendanceRecord[] }> = ({ records 
     );
 };
 
+interface AttendanceViewProps {
+  onStudentSelect: (studentId: string) => void;
+}
 
-export const AttendanceView: React.FC = () => {
+export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect }) => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
@@ -224,7 +236,7 @@ export const AttendanceView: React.FC = () => {
 
     return (
         <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
-            <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">تسجيل الحضور والغياب</h2>
+            <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">تسجيل الحاضر والغياب</h2>
             
             {submitStatus && (
                 <div className={`p-4 mb-4 rounded-md text-center ${submitStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -282,7 +294,7 @@ export const AttendanceView: React.FC = () => {
             </div>
 
             <div className="mt-8">
-                {!interactionStarted ? <TodayRecordsTable records={todayRecords} /> : (
+                {!interactionStarted ? <TodayRecordsTable records={todayRecords} onStudentSelect={onStudentSelect} /> : (
                     <form onSubmit={handleSubmit}>
                         {filteredStudents.length > 0 ? (
                             <div className="space-y-3">
