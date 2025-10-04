@@ -4,6 +4,8 @@ import { MedicalIcon } from '../icons/MedicalIcon';
 import { UsersIcon } from '../icons/UsersIcon';
 import { UserIcon } from '../icons/UserIcon';
 import { MoonIcon } from '../icons/MoonIcon';
+import { DocumentReportIcon } from '../icons/DocumentReportIcon';
+import { UserCircleIcon } from '../icons/UserCircleIcon';
 
 interface DormitoryHomeViewProps {
   navigateTo: (view: DormitoryViewType) => void;
@@ -41,6 +43,19 @@ const MainModuleCard: React.FC<{
   </div>
 );
 
+const ReportCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  onClick: () => void;
+}> = ({ icon, title, onClick }) => (
+    <button onClick={onClick} className="w-full flex items-center gap-4 p-4 bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-xl shadow-sm hover:bg-white hover:shadow-lg hover:border-slate-300 transition-all duration-300 transform hover:scale-105">
+        <div className="bg-purple-100 text-purple-600 rounded-lg p-3">
+            {icon}
+        </div>
+        <span className="font-semibold text-slate-700">{title}</span>
+    </button>
+)
+
 export const DormitoryHomeView: React.FC<DormitoryHomeViewProps> = ({ navigateTo }) => {
   return (
     <div className="max-w-6xl mx-auto space-y-16">
@@ -77,6 +92,25 @@ export const DormitoryHomeView: React.FC<DormitoryHomeViewProps> = ({ navigateTo
                 description="تسجيل إذن للطالب للمبيت خارج المهجع لليلة واحدة أو أكثر."
                 onClick={() => navigateTo('overnightLeave')}
                 gradient="from-slate-700 to-gray-800"
+            />
+        </div>
+      </div>
+      
+      <div>
+        <h2 className="text-3xl font-bold text-slate-800 mb-4 text-center">التقارير والملخصات</h2>
+        <p className="text-lg text-slate-500 mb-8 text-center">
+            استعرض وحلل بيانات الأذونات من خلال التقارير الشاملة التالية.
+        </p>
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+            <ReportCard 
+                icon={<DocumentReportIcon className="w-6 h-6" />}
+                title="الخلاصة العامة"
+                onClick={() => navigateTo('generalRecap')}
+            />
+            <ReportCard 
+                icon={<UserCircleIcon className="w-6 h-6" />}
+                title="ملخص الطالب"
+                onClick={() => navigateTo('studentRecap')}
             />
         </div>
       </div>

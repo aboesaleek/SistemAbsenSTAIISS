@@ -10,13 +10,19 @@ import { MedicalIcon } from '../components/icons/MedicalIcon';
 import { UsersIcon } from '../components/icons/UsersIcon';
 import { UserIcon } from '../components/icons/UserIcon';
 import { MoonIcon } from '../components/icons/MoonIcon';
+import { DocumentReportIcon } from '../components/icons/DocumentReportIcon';
+import { GeneralRecapView } from '../components/dormitory/GeneralRecapView';
+import { StudentRecapView } from '../components/dormitory/StudentRecapView';
+import { UserCircleIcon } from '../components/icons/UserCircleIcon';
 
 export type DormitoryViewType = 
   'home' | 
   'sickLeave' | 
   'groupLeave' | 
   'individualLeave' | 
-  'overnightLeave';
+  'overnightLeave' |
+  'generalRecap' |
+  'studentRecap';
 
 interface DormitoryDashboardProps {
   onLogout: () => void;
@@ -24,6 +30,12 @@ interface DormitoryDashboardProps {
 
 export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout }) => {
   const [currentView, setCurrentView] = useState<DormitoryViewType>('home');
+  const [selectedStudentIdForRecap, setSelectedStudentIdForRecap] = useState<string | null>(null);
+
+  const handleStudentSelectForRecap = (studentId: string) => {
+    setSelectedStudentIdForRecap(studentId);
+    setCurrentView('studentRecap');
+  };
 
   const renderView = () => {
     switch (currentView) {
@@ -37,6 +49,10 @@ export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout
         return <IndividualLeaveView />;
       case 'overnightLeave':
         return <OvernightLeaveView />;
+      case 'generalRecap':
+        return <GeneralRecapView onStudentSelect={handleStudentSelectForRecap} />;
+      case 'studentRecap':
+        return <StudentRecapView preselectedStudentId={selectedStudentIdForRecap} />;
       default:
         return <DormitoryHomeView navigateTo={setCurrentView} />;
     }
@@ -49,6 +65,20 @@ export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout
       icon: <HomeIcon className="w-6 h-6" />,
       isActive: currentView === 'home',
       onClick: () => setCurrentView('home'),
+    },
+    {
+      id: 'generalRecap',
+      label: 'الخلاصة العامة',
+      icon: <DocumentReportIcon className="w-6 h-6" />,
+      isActive: currentView === 'generalRecap',
+      onClick: () => setCurrentView('generalRecap'),
+    },
+    {
+      id: 'studentRecap',
+      label: 'ملخص الطالب',
+      icon: <UserCircleIcon className="w-6 h-6" />,
+      isActive: currentView === 'studentRecap',
+      onClick: () => setCurrentView('studentRecap'),
     },
     {
       id: 'sickLeave',
