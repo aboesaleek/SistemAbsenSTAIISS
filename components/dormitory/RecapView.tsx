@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { DormitoryPermissionRecord, DormitoryRecapStatus, Dormitory } from '../../types';
+// FIX: Import Student type to correctly type data from Supabase.
+import { DormitoryPermissionRecord, DormitoryRecapStatus, Dormitory, Student } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { supabase } from '../../supabaseClient';
@@ -26,25 +27,26 @@ export const RecapView: React.FC = () => {
             setDormitories(dormsData || []);
             const dormsMap = new Map((dormsData || []).map(d => [d.id, d.name]));
 
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('id, name, dormitoryId');
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('id, name, dormitory_id');
             if (studentsError) throw studentsError;
-            const studentsMap = new Map((studentsData || []).map(s => [s.id, s]));
+            // FIX: Explicitly type map to provide type safety for Supabase data.
+            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
 
             const { data: permissionsData, error: permissionsError } = await supabase.from('dormitory_permissions').select('*');
             if (permissionsError) throw permissionsError;
 
-            const fetchedRecords = (permissionsData || []).map(p => {
-                const student = studentsMap.get(p.studentId);
-                const dormitoryName = student ? dormsMap.get(student.dormitoryId) : 'N/A';
+            const fetchedRecords = (permissionsData || []).map((p: any) => {
+                const student = studentsMap.get(p.student_id);
+                const dormitoryName = student ? dormsMap.get(student.dormitory_id) : 'N/A';
                 return {
                     id: p.id,
-                    studentId: p.studentId,
+                    studentId: p.student_id,
                     studentName: student?.name || 'طالب محذوف',
-                    dormitoryId: student?.dormitoryId || '',
+                    dormitoryId: student?.dormitory_id || '',
                     dormitoryName: dormitoryName || 'N/A',
                     date: p.date,
                     status: p.type as DormitoryRecapStatus,
-                    numberOfDays: p.numberOfDays,
+                    numberOfDays: p.number_of_days,
                     reason: p.reason
                 };
             }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());

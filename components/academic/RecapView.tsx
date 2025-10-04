@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { AttendanceRecord, RecapStatus, Class } from '../../types';
+// FIX: Import Student and Course types to correctly type data from Supabase.
+import { AttendanceRecord, RecapStatus, Class, Student, Course } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { supabase } from '../../supabaseClient';
@@ -44,41 +45,42 @@ export const RecapView: React.FC = () => {
             const { data: absencesData, error: absencesError } = await supabase.from('academic_absences').select('*');
             if (absencesError) throw absencesError;
             
-            const studentsMap = new Map(studentsData.map(s => [s.id, s]));
-            const classesMap = new Map(classesData.map(c => [c.id, c]));
-            const coursesMap = new Map(coursesData.map(c => [c.id, c]));
+            // FIX: Explicitly type maps to provide type safety for Supabase data.
+            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
+            const classesMap = new Map<string, Class>((classesData || []).map(c => [c.id, c]));
+            const coursesMap = new Map<string, Course>((coursesData || []).map(c => [c.id, c]));
 
             const combined: CombinedRecord[] = [];
 
-            (permissionsData || []).forEach(p => {
-                const student = studentsMap.get(p.studentId);
+            (permissionsData || []).forEach((p: any) => {
+                const student = studentsMap.get(p.student_id);
                 if (!student) return;
-                const studentClass = classesMap.get(student.classId);
+                const studentClass = classesMap.get(student.class_id);
                 combined.push({
                     id: `p-${p.id}`,
                     sourceId: p.id,
                     sourceType: 'permission',
-                    studentId: p.studentId,
+                    studentId: p.student_id,
                     studentName: student.name,
-                    classId: student.classId || '',
+                    classId: student.class_id || '',
                     className: studentClass?.name || 'N/A',
                     date: p.date,
                     status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
                 });
             });
 
-            (absencesData || []).forEach(a => {
-                const student = studentsMap.get(a.studentId);
+            (absencesData || []).forEach((a: any) => {
+                const student = studentsMap.get(a.student_id);
                 if (!student) return;
-                const studentClass = classesMap.get(student.classId);
-                const course = coursesMap.get(a.courseId);
+                const studentClass = classesMap.get(student.class_id);
+                const course = coursesMap.get(a.course_id);
                 combined.push({
                     id: `a-${a.id}`,
                     sourceId: a.id,
                     sourceType: 'absence',
-                    studentId: a.studentId,
+                    studentId: a.student_id,
                     studentName: student.name,
-                    classId: student.classId || '',
+                    classId: student.class_id || '',
                     className: studentClass?.name || 'N/A',
                     date: a.date,
                     status: RecapStatus.ABSENT,

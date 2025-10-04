@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Class, Student, AttendanceRecord, RecapStatus } from '../../types';
+// FIX: Import Course type to correctly type data from Supabase.
+import { Class, Student, AttendanceRecord, RecapStatus, Course } from '../../types';
 import { supabase } from '../../supabaseClient';
 
 const StatCard: React.FC<{ label: string; value: number; gradient: string }> = ({ label, value, gradient }) => (
@@ -86,13 +87,14 @@ export const StudentRecapView: React.FC = () => {
                 if (classesError) throw classesError;
                 setClasses(classesData || []);
 
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('classId', 'is', null);
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
                 if (studentsError) throw studentsError;
                 setStudents(studentsData || []);
                 
                 const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
                 if (coursesError) throw coursesError;
-                const coursesMap = new Map((coursesData || []).map(c => [c.id, c.name]));
+                // FIX: Explicitly type map to provide type safety for Supabase data.
+                const coursesMap = new Map<string, string>((coursesData as Course[] || []).map(c => [c.id, c.name]));
 
                 const { data: permissionsData, error: permissionsError } = await supabase.from('academic_permissions').select('*');
                 if (permissionsError) throw permissionsError;
@@ -102,24 +104,24 @@ export const StudentRecapView: React.FC = () => {
                 
                 const combined: AttendanceRecord[] = [];
 
-                (permissionsData || []).forEach(p => {
+                (permissionsData || []).forEach((p: any) => {
                     combined.push({
                         id: `p-${p.id}`,
-                        studentId: p.studentId,
+                        studentId: p.student_id,
                         studentName: '', className: '', classId: '',
                         date: p.date,
                         status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
                     });
                 });
 
-                (absencesData || []).forEach(a => {
+                (absencesData || []).forEach((a: any) => {
                     combined.push({
                         id: `a-${a.id}`,
-                        studentId: a.studentId,
+                        studentId: a.student_id,
                         studentName: '', className: '', classId: '',
                         date: a.date,
                         status: RecapStatus.ABSENT,
-                        courseName: coursesMap.get(a.courseId) || 'غير معروف',
+                        courseName: coursesMap.get(a.course_id) || 'غير معروف',
                     });
                 });
                 
@@ -146,7 +148,7 @@ export const StudentRecapView: React.FC = () => {
     const filteredStudents = useMemo(() => {
         let result = students;
         if (selectedClassId) {
-            result = result.filter(s => s.classId === selectedClassId);
+            result = result.filter(s => s.class_id === selectedClassId);
         }
         if (searchQuery) {
             result = result.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));

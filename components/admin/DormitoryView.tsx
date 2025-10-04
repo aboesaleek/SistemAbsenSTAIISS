@@ -60,6 +60,9 @@ export const DormitoryView: React.FC = () => {
     const [dormitories, setDormitories] = useState<Dormitory[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isAddingDorm, setIsAddingDorm] = useState(false);
+    const [isAddingStudent, setIsAddingStudent] = useState(false);
+    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
     
     const newDormsRef = useRef<HTMLTextAreaElement>(null);
     const newStudentsRef = useRef<HTMLTextAreaElement>(null);
@@ -73,7 +76,7 @@ export const DormitoryView: React.FC = () => {
             setDormitories(dormsData || []);
 
             // Fetch only students who have a dormitoryId
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitoryId', 'is', null);
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitory_id', 'is', null);
             if (studentsError) throw studentsError;
             setStudents(studentsData || []);
         } catch (error: any) {
@@ -100,20 +103,45 @@ export const DormitoryView: React.FC = () => {
         fetchData();
     }, []);
 
-    const handleAdd = async (ref: React.RefObject<HTMLTextAreaElement>, tableName: string, additionalData?: Record<string, any>) => {
+    const handleGenericAdd = async (
+        ref: React.RefObject<HTMLTextAreaElement>,
+        tableName: string,
+        setLoading: (loading: boolean) => void,
+        itemType: string,
+        additionalData?: Record<string, any>
+    ) => {
         const content = ref.current?.value;
-        if (!content) return;
+        if (!content?.trim()) {
+            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} لإضافتها.` });
+            setTimeout(() => setMessage(null), 5000);
+            return;
+        }
+
+        setLoading(true);
+        setMessage(null);
 
         const items = content.split('\n').map(name => ({ name: name.trim(), ...additionalData })).filter(item => item.name);
         
+        if (items.length === 0) {
+            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} صالحة لإضافتها.` });
+            setLoading(false);
+            setTimeout(() => setMessage(null), 5000);
+            return;
+        }
+
         const { error } = await supabase.from(tableName).insert(items);
         
         if (error) {
+            setMessage({ type: 'error', text: `فشل في الإضافة: ${error.message}` });
             console.error(`فشل في الإضافة: ${error.message}`);
         } else {
+            setMessage({ type: 'success', text: `تمت إضافة ${items.length} ${itemType} بنجاح.` });
             ref.current!.value = '';
             fetchData(); // Refresh data
         }
+
+        setLoading(false);
+        setTimeout(() => setMessage(null), 5000);
     };
     
     const handleDelete = async (id: string | number, tableName: string) => {
@@ -133,12 +161,20 @@ export const DormitoryView: React.FC = () => {
     return (
         <div className="space-y-8">
             <h2 className="text-3xl font-bold text-slate-800">إدارة شؤون المهجع</h2>
+
+            {message && (
+                <div className={`p-4 rounded-md text-center ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {message.text}
+                </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card title="إضافة مهاجع">
                     <p className="text-sm text-slate-500 mb-3">أدخل كل اسم مهجع في سطر جديد.</p>
                     <textarea ref={newDormsRef} placeholder="مبنى أ&#x0a;مبنى ب&#x0a;..." className="w-full h-24 p-2 border rounded-md focus:ring-teal-500 focus:border-teal-500" />
-                    <button onClick={() => handleAdd(newDormsRef, 'dormitories')} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600"><PlusIcon className="w-5 h-5" /> إضافة</button>
+                    <button onClick={() => handleGenericAdd(newDormsRef, 'dormitories', setIsAddingDorm, 'مهاجع')} disabled={isAddingDorm} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:bg-teal-300 disabled:cursor-not-allowed">
+                        {isAddingDorm ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة</>}
+                    </button>
                 </Card>
                  <Card title="إضافة طلاب للمهجع">
                     <p className="text-sm text-slate-500 mb-3">أدخل كل اسم طالب في سطر جديد.</p>
@@ -150,13 +186,16 @@ export const DormitoryView: React.FC = () => {
                     <button onClick={() => {
                         const dormitoryId = newStudentDormRef.current?.value;
                         if (!dormitoryId) {
-                            console.error('يرجى اختيار المهجع أولاً.');
+                            setMessage({ type: 'error', text: 'يرجى اختيار المهجع أولاً.' });
+                            setTimeout(() => setMessage(null), 5000);
                             return;
                         }
                         // This assumes you add new students here.
                         // A more complex setup might involve assigning existing students.
-                        handleAdd(newStudentsRef, 'students', { dormitoryId: dormitoryId });
-                    }} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600"><PlusIcon className="w-5 h-5" /> إضافة</button>
+                        handleGenericAdd(newStudentsRef, 'students', setIsAddingStudent, 'طلاب', { dormitory_id: dormitoryId });
+                    }} disabled={isAddingStudent} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:bg-teal-300 disabled:cursor-not-allowed">
+                        {isAddingStudent ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة</>}
+                    </button>
                 </Card>
             </div>
             
@@ -171,7 +210,7 @@ export const DormitoryView: React.FC = () => {
             <Card title="الطلاب في المهاجع">
                 <DataTable 
                     headers={['#', 'اسم الطالب', 'المهجع']} 
-                    data={students.map((s, i) => [i + 1, s.name, dormitories.find(d => d.id === s.dormitoryId)?.name || 'N/A'])}
+                    data={students.map((s, i) => [i + 1, s.name, dormitories.find(d => d.id === s.dormitory_id)?.name || 'N/A'])}
                     onDelete={(id) => handleDelete(id, 'students')}
                     items={students}
                 />

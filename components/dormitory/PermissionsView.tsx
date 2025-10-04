@@ -26,7 +26,7 @@ export const PermissionsView: React.FC = () => {
                 if (dormsError) throw dormsError;
                 setDormitories(dormsData || []);
 
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitoryId', 'is', null);
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitory_id', 'is', null);
                 if (studentsError) throw studentsError;
                 setStudents(studentsData || []);
             } catch (error: any) {
@@ -40,7 +40,7 @@ export const PermissionsView: React.FC = () => {
 
     const filteredStudentsByDormitory = useMemo(() => {
         if (!selectedDormitoryId) return [];
-        return students.filter(s => s.dormitoryId === selectedDormitoryId);
+        return students.filter(s => s.dormitory_id === selectedDormitoryId);
     }, [selectedDormitoryId, students]);
 
     const searchedStudents = useMemo(() => {
@@ -56,7 +56,7 @@ export const PermissionsView: React.FC = () => {
     
     const handleStudentSearchSelect = (student: Student) => {
         setSearchQuery(student.name);
-        setSelectedDormitoryId(student.dormitoryId || '');
+        setSelectedDormitoryId(student.dormitory_id || '');
         setTimeout(() => {
             setSelectedStudentId(student.id);
         }, 0);
@@ -71,10 +71,10 @@ export const PermissionsView: React.FC = () => {
         }
         
         const { error } = await supabase.from('dormitory_permissions').insert({
-            studentId: selectedStudentId,
+            student_id: selectedStudentId,
             date,
             type: permissionType,
-            numberOfDays,
+            number_of_days: numberOfDays,
             reason,
         });
 
@@ -137,7 +137,7 @@ export const PermissionsView: React.FC = () => {
                                         className="p-3 hover:bg-purple-100 cursor-pointer"
                                         onClick={() => handleStudentSearchSelect(student)}
                                     >
-                                        {student.name} - <span className="text-sm text-slate-500">{dormitories.find(d => d.id === student.dormitoryId)?.name}</span>
+                                        {student.name} - <span className="text-sm text-slate-500">{dormitories.find(d => d.id === student.dormitory_id)?.name}</span>
                                     </li>
                                 ))}
                             </ul>

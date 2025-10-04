@@ -19,6 +19,7 @@ export const AttendanceView: React.FC = () => {
     const [markedAsAbsent, setMarkedAsAbsent] = useState<Set<string>>(new Set());
     const [interactionStarted, setInteractionStarted] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
+    const [submitStatus, setSubmitStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     
     const [classes, setClasses] = useState<Class[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -33,7 +34,7 @@ export const AttendanceView: React.FC = () => {
                 if (classesError) throw classesError;
                 setClasses(classesData || []);
 
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('classId', 'is', null);
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
                 if (studentsError) throw studentsError;
                 setStudents(studentsData || []);
                 
@@ -52,7 +53,7 @@ export const AttendanceView: React.FC = () => {
 
     const filteredStudents = useMemo(() => {
         if (!selectedClassId) return [];
-        return students.filter(s => s.classId === selectedClassId);
+        return students.filter(s => s.class_id === selectedClassId);
     }, [selectedClassId, students]);
 
     const searchedStudents = useMemo(() => {
@@ -70,7 +71,7 @@ export const AttendanceView: React.FC = () => {
 
     const handleStudentSearchSelect = (student: Student) => {
         setSearchQuery(student.name);
-        setSelectedClassId(student.classId || '');
+        setSelectedClassId(student.class_id || '');
         setShowSearchResults(false);
     };
     
@@ -88,26 +89,30 @@ export const AttendanceView: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setSubmitStatus(null);
+
         if (markedAsAbsent.size === 0) {
-            console.error('لم تحدد أي طالب كـ "غائب".');
+            setSubmitStatus({ type: 'error', text: 'لم تحدد أي طالب كـ "غائب".' });
             return;
         }
         if (!selectedCourseId) {
-            console.error('يرجى اختيار المادة الدراسية.');
+            setSubmitStatus({ type: 'error', text: 'يرجى اختيار المادة الدراسية.' });
             return;
         }
         
         const absenceData = Array.from(markedAsAbsent).map(studentId => ({
-            studentId,
+            student_id: studentId,
             date,
-            courseId: selectedCourseId,
+            course_id: selectedCourseId,
         }));
 
         const { error } = await supabase.from('academic_absences').insert(absenceData);
 
         if (error) {
             console.error(`فشل تسجيل الغياب: ${error.message}`);
+            setSubmitStatus({ type: 'error', text: `فشل تسجيل الغياب: ${error.message}` });
         } else {
+            setSubmitStatus({ type: 'success', text: `تم تسجيل غياب ${absenceData.length} طالب بنجاح.` });
             // Reset state after submission
             setMarkedAsAbsent(new Set());
             setSelectedClassId('');
@@ -125,6 +130,12 @@ export const AttendanceView: React.FC = () => {
         <div className="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-slate-200">
             <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">تسجيل الحضور والغياب</h2>
             
+            {submitStatus && (
+                <div className={`p-4 mb-4 rounded-md text-center ${submitStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {submitStatus.text}
+                </div>
+            )}
+
             {/* Search and Filter Controls */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="relative">
@@ -143,7 +154,7 @@ export const AttendanceView: React.FC = () => {
                         <ul className="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-lg">
                             {searchedStudents.map(student => (
                                 <li key={student.id} className="p-3 hover:bg-teal-100 cursor-pointer" onClick={() => handleStudentSearchSelect(student)}>
-                                    {student.name} - <span className="text-sm text-slate-500">{classes.find(c => c.id === student.classId)?.name}</span>
+                                    {student.name} - <span className="text-sm text-slate-500">{classes.find(c => c.id === student.class_id)?.name}</span>
                                 </li>
                             ))}
                         </ul>

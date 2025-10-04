@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { DormitoryPermissionRecord, DormitoryRecapStatus, Dormitory, DormitoryStudentRecapData } from '../../types';
+// FIX: Import Student type to correctly type data from Supabase.
+import { DormitoryPermissionRecord, DormitoryRecapStatus, Dormitory, DormitoryStudentRecapData, Student } from '../../types';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { supabase } from '../../supabaseClient';
 
@@ -16,24 +17,25 @@ export const DormitoryRecapView: React.FC = () => {
             if (dormsError) throw dormsError;
             setDormitories(dormsData || []);
 
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('id, name, dormitoryId');
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('id, name, dormitory_id');
             if (studentsError) throw studentsError;
-            const studentsMap = new Map((studentsData || []).map(s => [s.id, s]));
+            // FIX: Explicitly type map to provide type safety for Supabase data.
+            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
 
             const { data: permissionsData, error: permissionsError } = await supabase.from('dormitory_permissions').select('*');
             if (permissionsError) throw permissionsError;
 
-            const fetchedRecords = (permissionsData || []).map(p => {
-                const student = studentsMap.get(p.studentId);
+            const fetchedRecords = (permissionsData || []).map((p: any) => {
+                const student = studentsMap.get(p.student_id);
                 return {
                     id: p.id,
-                    studentId: p.studentId,
+                    studentId: p.student_id,
                     studentName: student?.name || 'طالب محذوف',
-                    dormitoryId: student?.dormitoryId || '',
+                    dormitoryId: student?.dormitory_id || '',
                     dormitoryName: '',
                     date: p.date,
                     status: p.type as DormitoryRecapStatus,
-                    numberOfDays: p.numberOfDays
+                    numberOfDays: p.number_of_days
                 };
             });
             

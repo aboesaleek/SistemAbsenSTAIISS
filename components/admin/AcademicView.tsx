@@ -61,6 +61,11 @@ export const AcademicView: React.FC = () => {
     const [students, setStudents] = useState<Student[]>([]);
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isAddingClass, setIsAddingClass] = useState(false);
+    const [isAddingStudent, setIsAddingStudent] = useState(false);
+    const [isAddingCourse, setIsAddingCourse] = useState(false);
+    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
 
     const newClassesRef = useRef<HTMLTextAreaElement>(null);
     const newStudentsRef = useRef<HTMLTextAreaElement>(null);
@@ -105,20 +110,45 @@ export const AcademicView: React.FC = () => {
         fetchData();
     }, []);
 
-    const handleAdd = async (ref: React.RefObject<HTMLTextAreaElement>, tableName: string, additionalData?: Record<string, any>) => {
+    const handleGenericAdd = async (
+        ref: React.RefObject<HTMLTextAreaElement>,
+        tableName: string,
+        setLoading: (loading: boolean) => void,
+        itemType: string,
+        additionalData?: Record<string, any>
+    ) => {
         const content = ref.current?.value;
-        if (!content) return;
-        
+        if (!content?.trim()) {
+            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} لإضافتها.` });
+            setTimeout(() => setMessage(null), 5000);
+            return;
+        }
+
+        setLoading(true);
+        setMessage(null);
+
         const items = content.split('\n').map(name => ({ name: name.trim(), ...additionalData })).filter(item => item.name);
         
+        if (items.length === 0) {
+            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} صالحة لإضافتها.` });
+            setLoading(false);
+            setTimeout(() => setMessage(null), 5000);
+            return;
+        }
+
         const { error } = await supabase.from(tableName).insert(items);
         
         if (error) {
+            setMessage({ type: 'error', text: `فشل في الإضافة: ${error.message}` });
             console.error(`فشل في الإضافة: ${error.message}`);
         } else {
+            setMessage({ type: 'success', text: `تمت إضافة ${items.length} ${itemType} بنجاح.` });
             ref.current!.value = '';
             fetchData(); // Refresh data
         }
+
+        setLoading(false);
+        setTimeout(() => setMessage(null), 5000);
     };
 
     const handleDelete = async (id: string | number, tableName: string) => {
@@ -139,11 +169,19 @@ export const AcademicView: React.FC = () => {
         <div className="space-y-8">
             <h2 className="text-3xl font-bold text-slate-800">إدارة الشؤون الأكاديمية</h2>
             
+            {message && (
+                <div className={`p-4 rounded-md text-center ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {message.text}
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <Card title="إضافة فصول دراسية">
                     <p className="text-sm text-slate-500 mb-3">أدخل كل اسم فصل في سطر جديد.</p>
                     <textarea ref={newClassesRef} placeholder="الفصل أ&#x0a;الفصل ب&#x0a;..." className="w-full h-24 p-2 border rounded-md focus:ring-teal-500 focus:border-teal-500" />
-                    <button onClick={() => handleAdd(newClassesRef, 'classes')} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600"><PlusIcon className="w-5 h-5" /> إضافة</button>
+                    <button onClick={() => handleGenericAdd(newClassesRef, 'classes', setIsAddingClass, 'فصول')} disabled={isAddingClass} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:bg-teal-300 disabled:cursor-not-allowed">
+                        {isAddingClass ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة</>}
+                    </button>
                 </Card>
                  <Card title="إضافة طلاب">
                     <p className="text-sm text-slate-500 mb-3">أدخل كل اسم طالب في سطر جديد.</p>
@@ -155,16 +193,21 @@ export const AcademicView: React.FC = () => {
                     <button onClick={() => {
                         const classId = newStudentClassRef.current?.value;
                         if (!classId) {
-                            console.error('يرجى اختيار الفصل الدراسي أولاً.');
+                            setMessage({ type: 'error', text: 'يرجى اختيار الفصل الدراسي أولاً.' });
+                            setTimeout(() => setMessage(null), 5000);
                             return;
                         }
-                        handleAdd(newStudentsRef, 'students', { classId: classId });
-                    }} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600"><PlusIcon className="w-5 h-5" /> إضافة</button>
+                        handleGenericAdd(newStudentsRef, 'students', setIsAddingStudent, 'طلاب', { class_id: classId });
+                    }} disabled={isAddingStudent} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:bg-teal-300 disabled:cursor-not-allowed">
+                        {isAddingStudent ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة</>}
+                    </button>
                 </Card>
                 <Card title="إضافة مواد دراسية">
                     <p className="text-sm text-slate-500 mb-3">أدخل כל اسم مادة في سطر جديد.</p>
                     <textarea ref={newCoursesRef} placeholder="المادة 1&#x0a;المادة 2&#x0a;..." className="w-full h-24 p-2 border rounded-md" />
-                    <button onClick={() => handleAdd(newCoursesRef, 'courses')} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600"><PlusIcon className="w-5 h-5" /> إضافة</button>
+                    <button onClick={() => handleGenericAdd(newCoursesRef, 'courses', setIsAddingCourse, 'مواد دراسية')} disabled={isAddingCourse} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:bg-teal-300 disabled:cursor-not-allowed">
+                        {isAddingCourse ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة</>}
+                    </button>
                 </Card>
             </div>
             
@@ -179,7 +222,7 @@ export const AcademicView: React.FC = () => {
             <Card title="الطلاب المسجلون">
                 <DataTable 
                     headers={['#', 'اسم الطالب', 'الفصل الدراسي']} 
-                    data={students.map((s, i) => [i + 1, s.name, classes.find(c => c.id === s.classId)?.name || 'N/A'])}
+                    data={students.map((s, i) => [i + 1, s.name, classes.find(c => c.id === s.class_id)?.name || 'N/A'])}
                     onDelete={(id) => handleDelete(id, 'students')}
                     items={students}
                 />

@@ -52,6 +52,7 @@ const DataTable: React.FC<{ headers: string[]; data: any[][]; }> = ({ headers, d
 export const UsersView: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
     const emailRef = useRef<HTMLInputElement>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
@@ -60,17 +61,11 @@ export const UsersView: React.FC = () => {
     async function fetchUsers() {
         setLoading(true);
         try {
-            // Fetch users from the 'profiles' table
             const { data, error } = await supabase.from('profiles').select('*');
             if (error) throw error;
-            
-            // The table has 'id' and 'role'. The screenshot shows a 'username' column with email.
-            // Ensure your 'profiles' table has a 'username' column that stores the email.
-            // If not, you'd need to fetch from auth.users which is not possible on client-side.
-            // Assuming 'profiles' table has {id, role, username}
             setUsers(data || []);
         } catch (error: any) {
-            console.error(`فشل في جلب المستخدمين: ${error.message}`);
+            setMessage({ type: 'error', text: `فشل في جلب المستخدمين: ${error.message}` });
         } finally {
             setLoading(false);
         }
@@ -82,55 +77,63 @@ export const UsersView: React.FC = () => {
 
     const handleAddUser = async (e: React.FormEvent) => {
         e.preventDefault();
+        setLoading(true);
+        setMessage(null);
+
         const email = emailRef.current?.value;
         const password = passwordRef.current?.value;
         const role = roleRef.current?.value as AppRole;
 
         if (!email || !password || !role) {
-            console.error("يرجى ملء جميع الحقول.");
+            setMessage({ type: 'error', text: "يرجى ملء جميع الحقول." });
+            setLoading(false);
             return;
         }
 
-        try {
-            setLoading(true);
-            // Step 1: Create the user in Supabase Auth
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                email,
-                password,
-            });
+        // Dengan trigger SQL, kita tidak perlu lagi menyisipkan profil secara manual.
+        // Cukup kirim 'role' sebagai metadata, dan trigger akan menanganinya.
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    role: role, // Metadata ini akan dibaca oleh trigger di database
+                },
+            },
+        });
 
-            if (signUpError) throw signUpError;
-            if (!signUpData.user) throw new Error("فشل في إنشاء مستخدم في نظام المصادقة.");
-
-            // Step 2: Insert the user's profile and role into the 'profiles' table
-            // This will only succeed if the current user is a super_admin due to RLS policies.
-            const { error: profileError } = await supabase.from('profiles').insert({
-                id: signUpData.user.id,
-                role: role,
-                username: email, // Assuming you have a username column for the email
-            });
-
-            if (profileError) {
-                // Important: If profile creation fails, you might want to delete the auth user
-                // to avoid orphaned users. This requires an admin client on the server.
-                // For now, we'll just show the error.
-                throw profileError;
+        if (error) {
+            let userMessage = error.message;
+            if (userMessage.includes("User already registered")) {
+                userMessage = "هذا البريد الإلكتروني مسجل بالفعل.";
+            } else if (userMessage.includes("Password should be at least 6 characters")) {
+                userMessage = "يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل.";
+            } else if (userMessage.includes("violates row-level security policy for table \"profiles\"")) {
+                // Pesan ini sekarang lebih relevan karena trigger berjalan di server
+                userMessage = "فشل في إنشاء الملف الشخصي: تحقق من أذونات trigger SQL أو سياسات RLS.";
             }
-            
-            fetchUsers(); // Refresh the list
-            // Clear form
-            emailRef.current!.value = '';
-            passwordRef.current!.value = '';
-            
-        } catch (error: any) {
-            console.error(`فشل في إضافة المستخدم: ${error.message}`);
-        } finally {
+            setMessage({ type: 'error', text: `فشل في إنشاء المستخدم: ${userMessage}` });
             setLoading(false);
+            return;
         }
+        
+        // Success
+        setMessage({ type: 'success', text: "تمت إضافة المستخدم بنجاح! سيظهر في القائمة بعد لحظات." });
+        
+        // Beri sedikit waktu agar trigger berjalan sebelum memuat ulang data
+        setTimeout(() => {
+            fetchUsers();
+        }, 1000);
+
+        if (emailRef.current) emailRef.current.value = '';
+        if (passwordRef.current) passwordRef.current.value = '';
+
+        setLoading(false);
+        setTimeout(() => setMessage(null), 8000);
     };
 
 
-    if (loading) {
+    if (loading && users.length === 0) {
         return <div className="text-center p-8">...جاري تحميل المستخدمين</div>;
     }
 
@@ -138,6 +141,12 @@ export const UsersView: React.FC = () => {
     return (
         <div className="space-y-8">
             <h2 className="text-3xl font-bold text-slate-800">إدارة المستخدمين</h2>
+            
+            {message && (
+                <div className={`p-4 mb-6 rounded-md text-center whitespace-pre-line ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {message.text}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1">
@@ -160,8 +169,7 @@ export const UsersView: React.FC = () => {
                                 </select>
                             </div>
                             <button type="submit" disabled={loading} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50">
-                                <PlusIcon className="w-5 h-5" />
-                                إضافة مستخدم
+                                {loading ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة مستخدم</>}
                             </button>
                         </form>
                     </Card>

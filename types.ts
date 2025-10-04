@@ -13,8 +13,8 @@ export interface Class {
 export interface Student {
   id:string;
   name: string;
-  classId?: string;
-  dormitoryId?: string;
+  class_id?: string;
+  dormitory_id?: string;
   created_at?: string;
 }
 

@@ -24,7 +24,7 @@ export const PermissionsView: React.FC = () => {
                 if (classesError) throw classesError;
                 setClasses(classesData || []);
 
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('classId', 'is', null);
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
                 if (studentsError) throw studentsError;
                 setStudents(studentsData || []);
             } catch (error: any) {
@@ -38,7 +38,7 @@ export const PermissionsView: React.FC = () => {
 
     const filteredStudentsByClass = useMemo(() => {
         if (!selectedClassId) return [];
-        return students.filter(s => s.classId === selectedClassId);
+        return students.filter(s => s.class_id === selectedClassId);
     }, [selectedClassId, students]);
 
     const searchedStudents = useMemo(() => {
@@ -55,7 +55,7 @@ export const PermissionsView: React.FC = () => {
     
     const handleStudentSearchSelect = (student: Student) => {
         setSearchQuery(student.name);
-        setSelectedClassId(student.classId || '');
+        setSelectedClassId(student.class_id || '');
         // Use a timeout to allow the class dropdown to update and re-render the student dropdown
         setTimeout(() => {
             setSelectedStudentId(student.id);
@@ -71,10 +71,9 @@ export const PermissionsView: React.FC = () => {
         }
         
         const { error } = await supabase.from('academic_permissions').insert({
-            studentId: selectedStudentId,
+            student_id: selectedStudentId,
             date,
             type: permissionType,
-            reason
         });
 
         if (error) {
@@ -136,7 +135,7 @@ export const PermissionsView: React.FC = () => {
                                         className="p-3 hover:bg-teal-100 cursor-pointer"
                                         onClick={() => handleStudentSearchSelect(student)}
                                     >
-                                        {student.name} - <span className="text-sm text-slate-500">{classes.find(c => c.id === student.classId)?.name}</span>
+                                        {student.name} - <span className="text-sm text-slate-500">{classes.find(c => c.id === student.class_id)?.name}</span>
                                     </li>
                                 ))}
                             </ul>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { AttendanceRecord, RecapStatus, Class, StudentRecapData } from '../../types';
+// FIX: Import Student type to correctly type data from Supabase.
+import { AttendanceRecord, RecapStatus, Class, StudentRecapData, Student } from '../../types';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { supabase } from '../../supabaseClient';
 
@@ -25,32 +26,33 @@ export const ClassRecapView: React.FC = () => {
             const { data: absencesData, error: absencesError } = await supabase.from('academic_absences').select('*');
             if (absencesError) throw absencesError;
             
-            const studentsMap = new Map(studentsData.map(s => [s.id, s]));
+            // FIX: Explicitly type map to provide type safety for Supabase data.
+            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
             
             const combined: AttendanceRecord[] = [];
 
-            (permissionsData || []).forEach(p => {
-                const student = studentsMap.get(p.studentId);
+            (permissionsData || []).forEach((p: any) => {
+                const student = studentsMap.get(p.student_id);
                 if (!student) return;
                 combined.push({
                     id: `p-${p.id}`,
-                    studentId: p.studentId,
+                    studentId: p.student_id,
                     studentName: student.name,
-                    classId: student.classId || '',
+                    classId: student.class_id || '',
                     className: '', // not needed for this calculation
                     date: p.date,
                     status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
                 });
             });
 
-            (absencesData || []).forEach(a => {
-                const student = studentsMap.get(a.studentId);
+            (absencesData || []).forEach((a: any) => {
+                const student = studentsMap.get(a.student_id);
                 if (!student) return;
                 combined.push({
                     id: `a-${a.id}`,
-                    studentId: a.studentId,
+                    studentId: a.student_id,
                     studentName: student.name,
-                    classId: student.classId || '',
+                    classId: student.class_id || '',
                     className: '', // not needed for this calculation
                     date: a.date,
                     status: RecapStatus.ABSENT,

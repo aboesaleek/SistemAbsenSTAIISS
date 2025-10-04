@@ -77,7 +77,7 @@ export const StudentRecapView: React.FC = () => {
     
     const [dormitories, setDormitories] = useState<Dormitory[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
-    const [allRecords, setAllRecords] = useState<DormitoryPermissionRecord[]>([]);
+    const [allRecords, setAllRecords] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -88,7 +88,7 @@ export const StudentRecapView: React.FC = () => {
                 if (dormsError) throw dormsError;
                 setDormitories(dormsData || []);
 
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitoryId', 'is', null);
+                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitory_id', 'is', null);
                 if (studentsError) throw studentsError;
                 setStudents(studentsData || []);
                 
@@ -108,9 +108,9 @@ export const StudentRecapView: React.FC = () => {
 
     const studentData = useMemo(() => {
         if (!selectedStudentId) return null;
-        const records = allRecords.filter(r => r.studentId === selectedStudentId);
-        const izinKeluarRecords = records.filter(r => r.status === DormitoryRecapStatus.IZIN_KELUAR);
-        const izinPulangRecords = records.filter(r => r.status === DormitoryRecapStatus.IZIN_PULANG);
+        const records = allRecords.filter(r => r.student_id === selectedStudentId);
+        const izinKeluarRecords = records.filter(r => r.type === DormitoryRecapStatus.IZIN_KELUAR);
+        const izinPulangRecords = records.filter(r => r.type === DormitoryRecapStatus.IZIN_PULANG);
         const uniqueDays = new Set(records.map(r => r.date)).size;
         return { izinKeluarRecords, izinPulangRecords, uniqueDays, allRecords: records.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) };
     }, [selectedStudentId, allRecords]);
@@ -124,7 +124,7 @@ export const StudentRecapView: React.FC = () => {
     
     const handleStudentSearchSelect = (student: Student) => {
         setSearchQuery(student.name);
-        setSelectedDormitoryId(student.dormitoryId || '');
+        setSelectedDormitoryId(student.dormitory_id || '');
         // Allow state to update before setting the student
         setTimeout(() => {
             setSelectedStudentId(student.id);
@@ -163,7 +163,7 @@ export const StudentRecapView: React.FC = () => {
                                         className="p-3 hover:bg-purple-100 cursor-pointer"
                                         onClick={() => handleStudentSearchSelect(student)}
                                     >
-                                        {student.name} - <span className="text-sm text-slate-500">{dormitories.find(d => d.id === student.dormitoryId)?.name}</span>
+                                        {student.name} - <span className="text-sm text-slate-500">{dormitories.find(d => d.id === student.dormitory_id)?.name}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -184,7 +184,7 @@ export const StudentRecapView: React.FC = () => {
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100"
                     >
                         <option value="">-- اختر الطالب --</option>
-                        {students.filter(s => s.dormitoryId === selectedDormitoryId).map(s => (
+                        {students.filter(s => s.dormitory_id === selectedDormitoryId).map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
@@ -230,11 +230,11 @@ export const StudentRecapView: React.FC = () => {
                                         <tr key={r.id} className="bg-white border-b hover:bg-slate-50">
                                             <td className="px-4 py-3">{r.date}</td>
                                             <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${r.status === DormitoryRecapStatus.IZIN_KELUAR ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                                                    {r.status}
+                                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${r.type === DormitoryRecapStatus.IZIN_KELUAR ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                                                    {r.type}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3">{r.numberOfDays}</td>
+                                            <td className="px-4 py-3">{r.number_of_days}</td>
                                             <td className="px-4 py-3 text-slate-500">{r.reason || '-'}</td>
                                         </tr>
                                     )) : (
