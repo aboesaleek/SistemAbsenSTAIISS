@@ -107,9 +107,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect 
                 .from('academic_absences').select('*').eq('date', today);
             if (absencesError) throw absencesError;
             
-            const studentsMap = new Map((studentsData || []).map(s => [s.id, s]));
-            const classesMap = new Map((classesData || []).map(c => [c.id, c]));
-            const coursesMap = new Map((coursesData || []).map(c => [c.id, c]));
+            // FIX: Explicitly type maps to provide type safety for Supabase data.
+            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
+            // FIX: Explicitly type maps to provide type safety for Supabase data.
+            const classesMap = new Map<string, Class>((classesData || []).map(c => [c.id, c]));
+            // FIX: Explicitly type maps to provide type safety for Supabase data.
+            const coursesMap = new Map<string, Course>((coursesData || []).map(c => [c.id, c]));
 
             const combined: AttendanceRecord[] = [];
 

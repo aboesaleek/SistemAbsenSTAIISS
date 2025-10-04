@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 // FIX: Import Course type to correctly type data from Supabase.
 import { Class, Student, AttendanceRecord, RecapStatus, Course } from '../../types';
 import { supabase } from '../../supabaseClient';
+import { CloseIcon } from '../icons/CloseIcon';
 
 const StatCard: React.FC<{ label: string; value: number; gradient: string }> = ({ label, value, gradient }) => (
     <div className={`text-white p-4 rounded-xl shadow-lg bg-gradient-to-br ${gradient}`}>
@@ -76,6 +77,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState(preselectedStudentId || '');
+    const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
     
     const [classes, setClasses] = useState<Class[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -97,7 +99,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                 const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
                 if (coursesError) throw coursesError;
                 // FIX: Explicitly type map to provide type safety for Supabase data.
-                const coursesMap = new Map<string, string>((coursesData as Course[] || []).map(c => [c.id, c.name]));
+                const coursesMap = new Map<string, string>(((coursesData as Course[]) || []).map(c => [c.id, c.name]));
 
                 const { data: permissionsData, error: permissionsError } = await supabase.from('academic_permissions').select('*');
                 if (permissionsError) throw permissionsError;
@@ -157,6 +159,23 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         const uniqueDays = new Set(records.map(r => r.date)).size;
         return { absentRecords, permissionRecords, sickRecords, uniqueDays };
     }, [selectedStudentId, allRecords]);
+
+    const absenceDetailsByCourse = useMemo(() => {
+        if (!studentData?.absentRecords) return [];
+        const grouped: { [key: string]: string[] } = {};
+        studentData.absentRecords.forEach(record => {
+            const course = record.courseName || 'مادة غير محددة';
+            if (!grouped[course]) {
+                grouped[course] = [];
+            }
+            grouped[course].push(record.date);
+        });
+
+        return Object.entries(grouped).map(([courseName, dates]) => ({
+            courseName,
+            dates: dates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime()),
+        }));
+    }, [studentData]);
 
     const filteredStudents = useMemo(() => {
         let result = students;
@@ -237,11 +256,16 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-red-50/70 p-4 rounded-lg border border-red-200/80">
                                 <h4 className="font-bold text-red-800 mb-2 border-b-2 border-red-200 pb-2">سجل الغياب</h4>
-                                <ul className="space-y-2 text-sm text-red-900">
-                                    {studentData.absentRecords.length > 0 ? studentData.absentRecords.map(r => (
-                                        <li key={r.id}><strong>{r.date}:</strong> {r.courseName}</li>
-                                    )) : <li className="text-slate-500">لا يوجد</li>}
-                                </ul>
+                                <div className="text-sm text-center">
+                                    <p className="text-red-900 mb-2">إجمالي الغياب: <strong>{studentData.absentRecords.length}</strong></p>
+                                    <button
+                                        onClick={() => setIsAbsenceModalOpen(true)}
+                                        disabled={studentData.absentRecords.length === 0}
+                                        className="w-full text-center text-red-700 font-semibold bg-red-100 hover:bg-red-200 rounded-md py-2 transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                                    >
+                                        عرض التفاصيل
+                                    </button>
+                                </div>
                             </div>
                             <div className="bg-blue-50/70 p-4 rounded-lg border border-blue-200/80">
                                 <h4 className="font-bold text-blue-800 mb-2 border-b-2 border-blue-200 pb-2">سجل الإذن</h4>
@@ -259,6 +283,51 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                     )) : <li className="text-slate-500">لا يوجد</li>}
                                 </ul>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isAbsenceModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={() => setIsAbsenceModalOpen(false)}>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl p-6 relative animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                        <button
+                            onClick={() => setIsAbsenceModalOpen(false)}
+                            className="absolute top-4 left-4 text-slate-500 hover:text-slate-800 transition-colors p-1 rounded-full hover:bg-slate-100"
+                            aria-label="إغلاق"
+                        >
+                            <CloseIcon className="w-6 h-6" />
+                        </button>
+                        <h3 className="text-2xl font-bold text-slate-800 mb-4 border-b pb-3">
+                            تفاصيل سجل الغياب لـ <span className="text-teal-600">{students.find(s=>s.id === selectedStudentId)?.name}</span>
+                        </h3>
+                        <div className="overflow-y-auto max-h-[60vh]">
+                            <table className="w-full text-sm text-right text-slate-600">
+                                <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
+                                    <tr>
+                                        <th className="px-6 py-3 text-right">المادة الدراسية</th>
+                                        <th className="px-6 py-3 text-center">الغياب الأول</th>
+                                        <th className="px-6 py-3 text-center">الغياب الثاني</th>
+                                        <th className="px-6 py-3 text-center">الغياب الثالث</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {absenceDetailsByCourse.length > 0 ? (
+                                        absenceDetailsByCourse.map((item, index) => (
+                                            <tr key={index} className="bg-white border-b hover:bg-slate-50">
+                                                <td className="px-6 py-4 font-semibold">{item.courseName}</td>
+                                                <td className="px-6 py-4 text-center">{item.dates[0] || '-'}</td>
+                                                <td className="px-6 py-4 text-center">{item.dates[1] || '-'}</td>
+                                                <td className="px-6 py-4 text-center">{item.dates[2] || '-'}</td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={4} className="text-center py-8 text-slate-500">لا توجد سجلات غياب.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
