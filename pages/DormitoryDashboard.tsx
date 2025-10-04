@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { DashboardLayout, NavLinkItem } from '../components/layout/DashboardLayout';
 import { HomeIcon } from '../components/icons/HomeIcon';
-import { CheckCircleIcon } from '../components/icons/CheckCircleIcon';
 import { DormitoryHomeView } from '../components/dormitory/DormitoryHomeView';
-import { PermissionsView } from '../components/dormitory/PermissionsView';
-import { RecapView } from '../components/dormitory/RecapView';
-import { DormitoryRecapView } from '../components/dormitory/DormitoryRecapView';
-import { StudentRecapView } from '../components/dormitory/StudentRecapView';
-import { DocumentReportIcon } from '../components/icons/DocumentReportIcon';
-import { ChartBarIcon } from '../components/icons/ChartBarIcon';
-import { UserCircleIcon } from '../components/icons/UserCircleIcon';
+import { SickLeaveView } from '../components/dormitory/SickLeaveView';
+import { GroupLeaveView } from '../components/dormitory/GroupLeaveView';
+import { IndividualLeaveView } from '../components/dormitory/IndividualLeaveView';
+import { OvernightLeaveView } from '../components/dormitory/OvernightLeaveView';
+import { MedicalIcon } from '../components/icons/MedicalIcon';
+import { UsersIcon } from '../components/icons/UsersIcon';
+import { UserIcon } from '../components/icons/UserIcon';
+import { MoonIcon } from '../components/icons/MoonIcon';
 
-export type DormitoryViewType = 'home' | 'permissions' | 'recap' | 'dormitoryRecap' | 'studentRecap';
+export type DormitoryViewType = 
+  'home' | 
+  'sickLeave' | 
+  'groupLeave' | 
+  'individualLeave' | 
+  'overnightLeave';
 
 interface DormitoryDashboardProps {
   onLogout: () => void;
@@ -24,14 +29,14 @@ export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout
     switch (currentView) {
       case 'home':
         return <DormitoryHomeView navigateTo={setCurrentView} />;
-      case 'permissions':
-        return <PermissionsView />;
-      case 'recap':
-        return <RecapView />;
-      case 'dormitoryRecap':
-        return <DormitoryRecapView />;
-      case 'studentRecap':
-        return <StudentRecapView />;
+      case 'sickLeave':
+        return <SickLeaveView />;
+      case 'groupLeave':
+        return <GroupLeaveView />;
+      case 'individualLeave':
+        return <IndividualLeaveView />;
+      case 'overnightLeave':
+        return <OvernightLeaveView />;
       default:
         return <DormitoryHomeView navigateTo={setCurrentView} />;
     }
@@ -46,32 +51,32 @@ export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout
       onClick: () => setCurrentView('home'),
     },
     {
-      id: 'permissions',
-      label: 'الأذونات',
-      icon: <CheckCircleIcon className="w-6 h-6" />,
-      isActive: currentView === 'permissions',
-      onClick: () => setCurrentView('permissions'),
+      id: 'sickLeave',
+      label: 'إذن خروج للمريض',
+      icon: <MedicalIcon className="w-6 h-6" />,
+      isActive: currentView === 'sickLeave',
+      onClick: () => setCurrentView('sickLeave'),
     },
     {
-      id: 'recap',
-      label: 'الملخص العام',
-      icon: <DocumentReportIcon className="w-6 h-6" />,
-      isActive: currentView === 'recap',
-      onClick: () => setCurrentView('recap'),
+      id: 'groupLeave',
+      label: 'إذن خروج جماعي',
+      icon: <UsersIcon className="w-6 h-6" />,
+      isActive: currentView === 'groupLeave',
+      onClick: () => setCurrentView('groupLeave'),
     },
     {
-      id: 'dormitoryRecap',
-      label: 'ملخص المهجع',
-      icon: <ChartBarIcon className="w-6 h-6" />,
-      isActive: currentView === 'dormitoryRecap',
-      onClick: () => setCurrentView('dormitoryRecap'),
+      id: 'individualLeave',
+      label: 'إذن خروج فردي',
+      icon: <UserIcon className="w-6 h-6" />,
+      isActive: currentView === 'individualLeave',
+      onClick: () => setCurrentView('individualLeave'),
     },
-     {
-      id: 'studentRecap',
-      label: 'ملخص الطالب',
-      icon: <UserCircleIcon className="w-6 h-6" />,
-      isActive: currentView === 'studentRecap',
-      onClick: () => setCurrentView('studentRecap'),
+    {
+      id: 'overnightLeave',
+      label: 'إذن مبيت',
+      icon: <MoonIcon className="w-6 h-6" />,
+      isActive: currentView === 'overnightLeave',
+      onClick: () => setCurrentView('overnightLeave'),
     },
   ];
 

@@ -4,8 +4,8 @@ import { DeleteIcon } from '../icons/DeleteIcon';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { supabase } from '../../supabaseClient';
 
-// Tipe data khusus untuk tampilan ini untuk menggabungkan informasi
-interface SickLeaveRecord {
+// Tipe data khusus untuk tampilan ini
+interface OvernightLeaveRecord {
     id: string;
     studentId: string;
     studentName: string;
@@ -16,8 +16,8 @@ interface SickLeaveRecord {
     reason?: string;
 }
 
-export const RecapView: React.FC = () => {
-    const [records, setRecords] = useState<SickLeaveRecord[]>([]);
+export const OvernightLeaveRecapView: React.FC = () => {
+    const [records, setRecords] = useState<OvernightLeaveRecord[]>([]);
     const [dormitories, setDormitories] = useState<Dormitory[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -35,11 +35,10 @@ export const RecapView: React.FC = () => {
             if (studentsError) throw studentsError;
             const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
 
-            // Ambil hanya izin sakit
             const { data: permissionsData, error: permissionsError } = await supabase
                 .from('dormitory_permissions')
                 .select('*')
-                .eq('type', DormitoryPermissionType.SICK_LEAVE);
+                .eq('type', DormitoryPermissionType.OVERNIGHT_LEAVE);
 
             if (permissionsError) throw permissionsError;
 
@@ -84,7 +83,7 @@ export const RecapView: React.FC = () => {
         if (error) {
             console.error(`فشل الحذف: ${error.message}`);
         } else {
-            fetchData(); // Muat ulang data setelah penghapusan
+            fetchData();
         }
     };
 
@@ -99,7 +98,7 @@ export const RecapView: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="no-print">
-                <h2 className="text-3xl font-bold text-slate-800">ملخص إذن الخروج للمريض</h2>
+                <h2 className="text-3xl font-bold text-slate-800">ملخص إذن المبيت</h2>
             </div>
             
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4 no-print">
@@ -127,7 +126,7 @@ export const RecapView: React.FC = () => {
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 printable-area">
-                <h3 className="text-2xl font-bold text-slate-800 mb-4 hidden print:block">ملخص إذن الخروج للمريض</h3>
+                <h3 className="text-2xl font-bold text-slate-800 mb-4 hidden print:block">ملخص إذن المبيت</h3>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-right text-slate-600">
                         <thead className="text-xs text-slate-700 uppercase bg-slate-100">

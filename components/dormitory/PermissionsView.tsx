@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Dormitory, Student, DormitoryPermissionType } from '../../types';
+// FIX: Import DormitoryRecapStatus to use the correct enum for permission types in this view.
+import { Dormitory, Student, DormitoryPermissionType, DormitoryRecapStatus } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 
@@ -9,7 +10,8 @@ export const PermissionsView: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState('');
-    const [permissionType, setPermissionType] = useState<DormitoryPermissionType>(DormitoryPermissionType.IZIN_KELUAR);
+    // FIX: Use DormitoryRecapStatus as it contains the correct values for this form's radio buttons.
+    const [permissionType, setPermissionType] = useState<DormitoryRecapStatus>(DormitoryRecapStatus.IZIN_KELUAR);
     const [numberOfDays, setNumberOfDays] = useState(1);
     const [reason, setReason] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -194,9 +196,10 @@ export const PermissionsView: React.FC = () => {
                                 <input 
                                     type="radio" 
                                     name="permissionType" 
-                                    value={DormitoryPermissionType.IZIN_KELUAR}
-                                    checked={permissionType === DormitoryPermissionType.IZIN_KELUAR}
-                                    onChange={() => setPermissionType(DormitoryPermissionType.IZIN_KELUAR)}
+                                    // FIX: Use DormitoryRecapStatus enum for value, checked, and onChange handler.
+                                    value={DormitoryRecapStatus.IZIN_KELUAR}
+                                    checked={permissionType === DormitoryRecapStatus.IZIN_KELUAR}
+                                    onChange={() => setPermissionType(DormitoryRecapStatus.IZIN_KELUAR)}
                                     className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-slate-400"
                                 />
                                 <span>إذن خروج</span>
@@ -205,9 +208,10 @@ export const PermissionsView: React.FC = () => {
                                 <input 
                                     type="radio" 
                                     name="permissionType" 
-                                    value={DormitoryPermissionType.IZIN_PULANG}
-                                    checked={permissionType === DormitoryPermissionType.IZIN_PULANG}
-                                    onChange={() => setPermissionType(DormitoryPermissionType.IZIN_PULANG)}
+                                    // FIX: Use DormitoryRecapStatus enum for value, checked, and onChange handler.
+                                    value={DormitoryRecapStatus.IZIN_PULANG}
+                                    checked={permissionType === DormitoryRecapStatus.IZIN_PULANG}
+                                    onChange={() => setPermissionType(DormitoryRecapStatus.IZIN_PULANG)}
                                     className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-slate-400"
                                 />
                                 <span>إذن عودة</span>

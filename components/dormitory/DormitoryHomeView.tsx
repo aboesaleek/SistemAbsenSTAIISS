@@ -1,9 +1,9 @@
 import React from 'react';
-import { PermissionIcon } from '../icons/PermissionIcon';
 import { DormitoryViewType } from '../../pages/DormitoryDashboard';
-import { DocumentReportIcon } from '../icons/DocumentReportIcon';
-import { ChartBarIcon } from '../icons/ChartBarIcon';
-import { UserCircleIcon } from '../icons/UserCircleIcon';
+import { MedicalIcon } from '../icons/MedicalIcon';
+import { UsersIcon } from '../icons/UsersIcon';
+import { UserIcon } from '../icons/UserIcon';
+import { MoonIcon } from '../icons/MoonIcon';
 
 interface DormitoryHomeViewProps {
   navigateTo: (view: DormitoryViewType) => void;
@@ -34,65 +34,49 @@ const MainModuleCard: React.FC<{
         {icon}
       </div>
       <div className="flex-grow">
-        <h3 className="text-3xl font-bold mb-2 drop-shadow-md">{title}</h3>
+        <h3 className="text-2xl font-bold mb-2 drop-shadow-md">{title}</h3>
         <p className="leading-relaxed opacity-90 drop-shadow-sm">{description}</p>
       </div>
     </button>
   </div>
 );
 
-const ReportCard: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  onClick: () => void;
-}> = ({ icon, title, onClick }) => (
-    <button onClick={onClick} className="w-full flex items-center gap-4 p-4 bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-xl shadow-sm hover:bg-white hover:shadow-lg hover:border-slate-300 transition-all duration-300 transform hover:scale-105">
-        <div className="bg-purple-100 text-purple-600 rounded-lg p-3">
-            {icon}
-        </div>
-        <span className="font-semibold text-slate-700">{title}</span>
-    </button>
-)
-
 export const DormitoryHomeView: React.FC<DormitoryHomeViewProps> = ({ navigateTo }) => {
   return (
     <div className="max-w-6xl mx-auto space-y-16">
       <div>
-        <h2 className="text-4xl font-bold text-slate-800 mb-4 text-center">الوحدة الرئيسية</h2>
+        <h2 className="text-4xl font-bold text-slate-800 mb-4 text-center">الوحدات الرئيسية</h2>
         <p className="text-xl text-slate-600 mb-8 text-center">
           ابدأ بتسجيل أذونات الطلاب للخروج أو العودة.
         </p>
-        <div className="max-w-lg mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <MainModuleCard
-                icon={<PermissionIcon className="w-10 h-10" />}
-                title="تسجيل الأذونات"
-                description="إدارة وتسجيل أذونات الطلاب سواء كانت للخروج من السكن أو العودة إلى المنزل."
-                onClick={() => navigateTo('permissions')}
-                gradient="from-purple-500 to-pink-600"
+                icon={<MedicalIcon className="w-10 h-10" />}
+                title="إذن خروج للمريض"
+                description="تسجيل إذن للطالب الذي يحتاج إلى مغادرة المهجع لأسباب صحية."
+                onClick={() => navigateTo('sickLeave')}
+                gradient="from-red-500 to-orange-500"
             />
-        </div>
-      </div>
-
-       <div>
-        <h2 className="text-3xl font-bold text-slate-800 mb-4 text-center">التقارير والملخصات</h2>
-        <p className="text-lg text-slate-500 mb-8 text-center">
-            استعرض وحلل بيانات الأذونات من خلال التقارير الشاملة التالية.
-        </p>
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <ReportCard 
-                icon={<DocumentReportIcon className="w-6 h-6" />}
-                title="الملخص العام"
-                onClick={() => navigateTo('recap')}
+            <MainModuleCard
+                icon={<UsersIcon className="w-10 h-10" />}
+                title="إذن خروج جماعي"
+                description="تسجيل إذن لمجموعة من الطلاب للمغادرة معًا لنشاط مشترك."
+                onClick={() => navigateTo('groupLeave')}
+                gradient="from-sky-500 to-indigo-600"
             />
-            <ReportCard 
-                icon={<ChartBarIcon className="w-6 h-6" />}
-                title="ملخص المهجع"
-                onClick={() => navigateTo('dormitoryRecap')}
+            <MainModuleCard
+                icon={<UserIcon className="w-10 h-10" />}
+                title="إذن خروج فردي"
+                description="تسجيل إذن طالب واحد للخروج لقضاء حوائج عامة أو شخصية."
+                onClick={() => navigateTo('individualLeave')}
+                gradient="from-emerald-500 to-teal-600"
             />
-            <ReportCard 
-                icon={<UserCircleIcon className="w-6 h-6" />}
-                title="ملخص الطالب"
-                onClick={() => navigateTo('studentRecap')}
+             <MainModuleCard
+                icon={<MoonIcon className="w-10 h-10" />}
+                title="إذن مبيت"
+                description="تسجيل إذن للطالب للمبيت خارج المهجع لليلة واحدة أو أكثر."
+                onClick={() => navigateTo('overnightLeave')}
+                gradient="from-slate-700 to-gray-800"
             />
         </div>
       </div>

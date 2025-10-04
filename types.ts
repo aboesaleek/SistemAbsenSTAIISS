@@ -67,8 +67,10 @@ export interface Permission {
 
 // Tipe baru untuk Perizinan Asrama
 export enum DormitoryPermissionType {
-  IZIN_KELUAR = 'إذن خروج', // Izin Keluar
-  IZIN_PULANG = 'إذن عودة',  // Izin Pulang
+  SICK_LEAVE = 'مرض',
+  GROUP_LEAVE = 'جماعي',
+  GENERAL_LEAVE = 'عام',
+  OVERNIGHT_LEAVE = 'مبيت',
 }
 
 export interface DormitoryPermission {

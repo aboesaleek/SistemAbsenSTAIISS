@@ -35,7 +35,7 @@ const SidebarLink: React.FC<{
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, navLinks, onLogout, dashboardTitle }) => {
   return (
     <aside
-      className={`bg-white shadow-lg flex flex-col h-screen sticky top-0 transition-all duration-300 z-30 ${
+      className={`bg-white shadow-lg flex flex-col h-screen sticky top-0 transition-all duration-300 z-30 no-print ${
         isCollapsed ? 'w-20' : 'w-64'
       }`}
     >
