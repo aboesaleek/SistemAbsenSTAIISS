@@ -1,15 +1,57 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Class, Student, Course } from '../../types';
+import { Class, Student, Course, AttendanceRecord, RecapStatus } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 
-const TodaySummary: React.FC = () => (
-    <div className="text-center p-8 bg-teal-50 border border-teal-200 rounded-lg mb-8">
-        <h3 className="text-2xl font-bold text-teal-800">ملخص بيانات اليوم</h3>
-        <p className="text-slate-600 mt-2">لم يتم تسجيل أي بيانات حتى الآن لهذا اليوم. ابدأ بالبحث عن طالب أو اختيار فصل دراسي.</p>
-        {/* In a real app, you would fetch and display actual summary data here */}
-    </div>
-);
+const statusColorMap: { [key in RecapStatus]: string } = {
+  [RecapStatus.ABSENT]: 'bg-red-100 text-red-800',
+  [RecapStatus.SICK]: 'bg-yellow-100 text-yellow-800',
+  [RecapStatus.PERMISSION]: 'bg-blue-100 text-blue-800',
+};
+
+const TodayRecordsTable: React.FC<{ records: AttendanceRecord[] }> = ({ records }) => {
+    if (records.length === 0) {
+        return (
+            <div className="text-center p-8 bg-slate-50 border border-slate-200 rounded-lg mb-8">
+                <h3 className="text-2xl font-bold text-slate-800">ملخص بيانات اليوم</h3>
+                <p className="text-slate-600 mt-2">لم يتم تسجيل أي بيانات لهذا اليوم. ابدأ بالبحث عن طالب أو اختيار فصل.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-6 bg-slate-50 border border-slate-200 rounded-lg mb-8">
+            <h3 className="text-2xl font-bold text-slate-800 mb-4 text-center">البيانات المسجلة اليوم</h3>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm text-right text-slate-600">
+                    <thead className="text-xs text-slate-700 uppercase bg-slate-200">
+                        <tr>
+                            <th className="px-6 py-3">اسم الطالب</th>
+                            <th className="px-6 py-3">الفصل</th>
+                            <th className="px-6 py-3">الحالة</th>
+                            <th className="px-6 py-3">المادة الدراسية</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                        {records.map((record) => (
+                            <tr key={record.id} className="border-b hover:bg-slate-50">
+                                <td className="px-6 py-4 font-semibold">{record.studentName}</td>
+                                <td className="px-6 py-4">{record.className}</td>
+                                <td className="px-6 py-4">
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColorMap[record.status]}`}>
+                                        {record.status}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4">{record.courseName || '-'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 
 export const AttendanceView: React.FC = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -20,34 +62,87 @@ export const AttendanceView: React.FC = () => {
     const [interactionStarted, setInteractionStarted] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [submitStatus, setSubmitStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
     
     const [classes, setClasses] = useState<Class[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
-            try {
-                const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
-                if (classesError) throw classesError;
-                setClasses(classesData || []);
+    async function fetchData() {
+        setLoading(true);
+        try {
+            const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
+            if (classesError) throw classesError;
+            setClasses(classesData || []);
 
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
-                if (studentsError) throw studentsError;
-                setStudents(studentsData || []);
-                
-                const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
-                if (coursesError) throw coursesError;
-                setCourses(coursesData || []);
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
+            if (studentsError) throw studentsError;
+            setStudents(studentsData || []);
+            
+            const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
+            if (coursesError) throw coursesError;
+            setCourses(coursesData || []);
 
-            } catch (error: any) {
-                console.error(`فشل في جلب البيانات: ${error.message}`);
-            } finally {
-                setLoading(false);
-            }
+            // Fetch today's detailed records
+            const today = new Date().toISOString().split('T')[0];
+
+            const { data: permissionsToday, error: permissionsError } = await supabase
+                .from('academic_permissions').select('*').eq('date', today);
+            if (permissionsError) throw permissionsError;
+
+            const { data: absencesToday, error: absencesError } = await supabase
+                .from('academic_absences').select('*').eq('date', today);
+            if (absencesError) throw absencesError;
+            
+            const studentsMap = new Map((studentsData || []).map(s => [s.id, s]));
+            const classesMap = new Map((classesData || []).map(c => [c.id, c]));
+            const coursesMap = new Map((coursesData || []).map(c => [c.id, c]));
+
+            const combined: AttendanceRecord[] = [];
+
+            (permissionsToday || []).forEach((p: any) => {
+                const student = studentsMap.get(p.student_id);
+                if (!student) return;
+                const studentClass = classesMap.get(student.class_id);
+                combined.push({
+                    id: `p-${p.id}`,
+                    studentId: p.student_id,
+                    studentName: student.name,
+                    classId: student.class_id || '',
+                    className: studentClass?.name || 'N/A',
+                    date: p.date,
+                    status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
+                });
+            });
+
+            (absencesToday || []).forEach((a: any) => {
+                const student = studentsMap.get(a.student_id);
+                if (!student) return;
+                const studentClass = classesMap.get(student.class_id);
+                const course = coursesMap.get(a.course_id);
+                combined.push({
+                    id: `a-${a.id}`,
+                    studentId: a.student_id,
+                    studentName: student.name,
+                    classId: student.class_id || '',
+                    className: studentClass?.name || 'N/A',
+                    date: a.date,
+                    status: RecapStatus.ABSENT,
+                    courseName: course?.name,
+                });
+            });
+
+            setTodayRecords(combined.sort((a, b) => a.studentName.localeCompare(b.studentName)));
+
+        } catch (error: any) {
+            console.error(`فشل في جلب البيانات: ${error.message}`);
+        } finally {
+            setLoading(false);
         }
+    }
+
+    useEffect(() => {
         fetchData();
     }, []);
 
@@ -113,7 +208,8 @@ export const AttendanceView: React.FC = () => {
             setSubmitStatus({ type: 'error', text: `فشل تسجيل الغياب: ${error.message}` });
         } else {
             setSubmitStatus({ type: 'success', text: `تم تسجيل غياب ${absenceData.length} طالب بنجاح.` });
-            // Reset state after submission
+            // Refresh today's data and reset form
+            fetchData();
             setMarkedAsAbsent(new Set());
             setSelectedClassId('');
             setSelectedCourseId('');
@@ -186,7 +282,7 @@ export const AttendanceView: React.FC = () => {
             </div>
 
             <div className="mt-8">
-                {!interactionStarted ? <TodaySummary /> : (
+                {!interactionStarted ? <TodayRecordsTable records={todayRecords} /> : (
                     <form onSubmit={handleSubmit}>
                         {filteredStudents.length > 0 ? (
                             <div className="space-y-3">
