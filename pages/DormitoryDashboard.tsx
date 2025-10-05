@@ -2,25 +2,16 @@ import React, { useState } from 'react';
 import { DashboardLayout, NavLinkItem } from '../components/layout/DashboardLayout';
 import { HomeIcon } from '../components/icons/HomeIcon';
 import { DormitoryHomeView } from '../components/dormitory/DormitoryHomeView';
-import { SickLeaveView } from '../components/dormitory/SickLeaveView';
-import { GroupLeaveView } from '../components/dormitory/GroupLeaveView';
-import { IndividualLeaveView } from '../components/dormitory/IndividualLeaveView';
-import { OvernightLeaveView } from '../components/dormitory/OvernightLeaveView';
-import { MedicalIcon } from '../components/icons/MedicalIcon';
-import { UsersIcon } from '../components/icons/UsersIcon';
-import { UserIcon } from '../components/icons/UserIcon';
-import { MoonIcon } from '../components/icons/MoonIcon';
+import { PermissionsView } from '../components/dormitory/PermissionsView';
 import { DocumentReportIcon } from '../components/icons/DocumentReportIcon';
 import { GeneralRecapView } from '../components/dormitory/GeneralRecapView';
 import { StudentRecapView } from '../components/dormitory/StudentRecapView';
 import { UserCircleIcon } from '../components/icons/UserCircleIcon';
+import { CheckCircleIcon } from '../components/icons/CheckCircleIcon';
 
 export type DormitoryViewType = 
   'home' | 
-  'sickLeave' | 
-  'groupLeave' | 
-  'individualLeave' | 
-  'overnightLeave' |
+  'permissions' |
   'generalRecap' |
   'studentRecap';
 
@@ -41,14 +32,8 @@ export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout
     switch (currentView) {
       case 'home':
         return <DormitoryHomeView navigateTo={setCurrentView} />;
-      case 'sickLeave':
-        return <SickLeaveView />;
-      case 'groupLeave':
-        return <GroupLeaveView />;
-      case 'individualLeave':
-        return <IndividualLeaveView />;
-      case 'overnightLeave':
-        return <OvernightLeaveView />;
+      case 'permissions':
+        return <PermissionsView />;
       case 'generalRecap':
         return <GeneralRecapView onStudentSelect={handleStudentSelectForRecap} />;
       case 'studentRecap':
@@ -67,6 +52,13 @@ export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout
       onClick: () => setCurrentView('home'),
     },
     {
+      id: 'permissions',
+      label: 'تسجيل الأذونات',
+      icon: <CheckCircleIcon className="w-6 h-6" />,
+      isActive: currentView === 'permissions',
+      onClick: () => setCurrentView('permissions'),
+    },
+    {
       id: 'generalRecap',
       label: 'الخلاصة العامة',
       icon: <DocumentReportIcon className="w-6 h-6" />,
@@ -79,34 +71,6 @@ export const DormitoryDashboard: React.FC<DormitoryDashboardProps> = ({ onLogout
       icon: <UserCircleIcon className="w-6 h-6" />,
       isActive: currentView === 'studentRecap',
       onClick: () => setCurrentView('studentRecap'),
-    },
-    {
-      id: 'sickLeave',
-      label: 'إذن خروج للمريض',
-      icon: <MedicalIcon className="w-6 h-6" />,
-      isActive: currentView === 'sickLeave',
-      onClick: () => setCurrentView('sickLeave'),
-    },
-    {
-      id: 'groupLeave',
-      label: 'إذن خروج جماعي',
-      icon: <UsersIcon className="w-6 h-6" />,
-      isActive: currentView === 'groupLeave',
-      onClick: () => setCurrentView('groupLeave'),
-    },
-    {
-      id: 'individualLeave',
-      label: 'إذن خروج فردي',
-      icon: <UserIcon className="w-6 h-6" />,
-      isActive: currentView === 'individualLeave',
-      onClick: () => setCurrentView('individualLeave'),
-    },
-    {
-      id: 'overnightLeave',
-      label: 'إذن مبيت',
-      icon: <MoonIcon className="w-6 h-6" />,
-      isActive: currentView === 'overnightLeave',
-      onClick: () => setCurrentView('overnightLeave'),
     },
   ];
 

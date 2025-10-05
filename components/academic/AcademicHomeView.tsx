@@ -35,7 +35,7 @@ const MainModuleCard: React.FC<{
         {icon}
       </div>
       <div className="flex-grow">
-        <h3 className="text-3xl font-bold mb-2 drop-shadow-md">{title}</h3>
+        <h3 className="text-2xl sm:text-3xl font-bold mb-2 drop-shadow-md">{title}</h3>
         <p className="leading-relaxed opacity-90 drop-shadow-sm">{description}</p>
       </div>
     </button>
@@ -59,8 +59,8 @@ export const AcademicHomeView: React.FC<AcademicHomeViewProps> = ({ navigateTo }
   return (
     <div className="max-w-6xl mx-auto space-y-16">
       <div>
-        <h2 className="text-4xl font-bold text-slate-800 mb-4 text-center">الوحدات الرئيسية</h2>
-        <p className="text-xl text-slate-600 mb-8 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4 text-center">الوحدات الرئيسية</h2>
+        <p className="text-lg md:text-xl text-slate-600 mb-8 text-center">
             ابدأ بتسجيل حضور الطلاب أو إدارة الأذونات اليومية.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

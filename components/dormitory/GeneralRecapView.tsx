@@ -126,7 +126,7 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
                 </select>
             </div>
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right text-slate-600">
+                <table className="w-full text-sm text-right text-slate-600 responsive-table">
                     <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                         <tr>
                             <th className="px-6 py-3">#</th>
@@ -141,17 +141,17 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
                     <tbody>
                         {filteredRecords.map((record, index) => (
                             <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                <td className="px-6 py-4">{index + 1}</td>
-                                <td className="px-6 py-4 font-semibold">
+                                <td data-label="#" className="px-6 py-4">{index + 1}</td>
+                                <td data-label="اسم الطالب" className="px-6 py-4 font-semibold">
                                      <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">
                                         {record.studentName}
                                     </button>
                                 </td>
-                                <td className="px-6 py-4">{record.dormitoryName}</td>
-                                <td className="px-6 py-4">{record.date}</td>
-                                <td className="px-6 py-4">{record.numberOfDays}</td>
-                                <td className="px-6 py-4 text-slate-500">{record.reason || '-'}</td>
-                                <td className="px-6 py-4 no-print">
+                                <td data-label="المهجع" className="px-6 py-4">{record.dormitoryName}</td>
+                                <td data-label="التاريخ" className="px-6 py-4">{record.date}</td>
+                                <td data-label="عدد الأيام" className="px-6 py-4">{record.numberOfDays}</td>
+                                <td data-label="البيان" className="px-6 py-4 text-slate-500">{record.reason || '-'}</td>
+                                <td className="px-6 py-4 no-print action-cell">
                                     <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800">
                                         <DeleteIcon className="w-5 h-5" />
                                     </button>

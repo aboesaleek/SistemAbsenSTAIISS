@@ -107,15 +107,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       <div className="w-full max-w-md mx-auto space-y-6">
         <div className="text-center space-y-2">
           <Logo className="mx-auto text-teal-500 h-20 w-20" />
-          <h1 className="text-3xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">
             نظام كشف الغياب والأذونات
           </h1>
-          <p className="text-xl font-semibold text-slate-600">
+          <p className="text-lg sm:text-xl font-semibold text-slate-600">
             جامعة الإمام الشافعي
           </p>
         </div>
 
-        <div className="bg-white/60 backdrop-blur-lg p-8 rounded-2xl border border-white/50 shadow-2xl space-y-8">
+        <div className="bg-white/60 backdrop-blur-lg p-6 sm:p-8 rounded-2xl border border-white/50 shadow-2xl space-y-8">
           <ModeToggle currentMode={mode} onModeChange={setMode} />
           
           <form className="space-y-6" onSubmit={handleFormSubmit}>

@@ -278,7 +278,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                             <div>
                                 <h4 className="text-lg font-bold text-slate-700 mb-3">غياب</h4>
                                 <div className="overflow-x-auto border border-red-200 rounded-lg">
-                                    <table className="w-full text-sm text-right text-slate-600">
+                                    <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-red-800 uppercase bg-red-100">
                                             <tr>
                                                 <th className="px-4 py-3">المادة الدراسية</th>
@@ -291,10 +291,10 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                             {studentData.absenceDetailsByCourse.size > 0 ? (
                                                 Array.from(studentData.absenceDetailsByCourse.entries()).map(([course, dates]) => (
                                                     <tr key={course} className="bg-white border-b border-red-100 last:border-b-0 hover:bg-red-50/50">
-                                                        <td className="px-4 py-3 font-semibold">{course}</td>
-                                                        <td className="px-4 py-3">{dates[0] || '-'}</td>
-                                                        <td className="px-4 py-3">{dates[1] || '-'}</td>
-                                                        <td className="px-4 py-3">{dates[2] || '-'}</td>
+                                                        <td data-label="المادة الدراسية" className="px-4 py-3 font-semibold">{course}</td>
+                                                        <td data-label="الغياب الأول" className="px-4 py-3">{dates[0] || '-'}</td>
+                                                        <td data-label="الغياب الثاني" className="px-4 py-3">{dates[1] || '-'}</td>
+                                                        <td data-label="الغياب الثالث" className="px-4 py-3">{dates[2] || '-'}</td>
                                                     </tr>
                                                 ))
                                             ) : (

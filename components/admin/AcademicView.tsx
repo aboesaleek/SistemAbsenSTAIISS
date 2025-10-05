@@ -19,7 +19,7 @@ const DataTable: React.FC<{
   items: (Class | Student | Course)[];
 }> = ({ headers, data, onDelete, items }) => (
     <div className="overflow-x-auto">
-        <table className="w-full text-sm text-right text-slate-600">
+        <table className="w-full text-sm text-right text-slate-600 responsive-table">
             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                 <tr>
                     {headers.map(h => <th key={h} className="px-6 py-3">{h}</th>)}
@@ -36,16 +36,18 @@ const DataTable: React.FC<{
                 ) : (
                     data.map((row, rowIndex) => (
                         <tr key={items[rowIndex].id} className="bg-white border-b hover:bg-slate-50">
-                            {row.map((cell, cellIndex) => <td key={cellIndex} className="px-6 py-4">{cell}</td>)}
-                            <td className="px-6 py-4 flex gap-3">
-                                <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
-                                    <EditIcon className="w-5 h-5" />
-                                </button>
-                                {onDelete && (
-                                    <button onClick={() => onDelete(items[rowIndex].id)} className="text-red-600 hover:text-red-800">
-                                        <DeleteIcon className="w-5 h-5" />
+                            {row.map((cell, cellIndex) => <td key={cellIndex} data-label={headers[cellIndex]} className="px-6 py-4">{cell}</td>)}
+                            <td className="px-6 py-4 action-cell">
+                                <div className="flex gap-3 justify-end">
+                                    <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
+                                        <EditIcon className="w-5 h-5" />
                                     </button>
-                                )}
+                                    {onDelete && (
+                                        <button onClick={() => onDelete(items[rowIndex].id)} className="text-red-600 hover:text-red-800">
+                                            <DeleteIcon className="w-5 h-5" />
+                                        </button>
+                                    )}
+                                </div>
                             </td>
                         </tr>
                     ))

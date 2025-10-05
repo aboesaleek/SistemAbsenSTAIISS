@@ -155,7 +155,7 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                     </h3>
                     {loading ? <div className="text-center p-8">...جاري تحديث البيانات</div> : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-right text-slate-600">
+                        <table className="w-full text-sm text-right text-slate-600 responsive-table">
                             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                                 <tr>
                                     <th className="px-6 py-3">اسم الطالب</th>
@@ -169,16 +169,16 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                             <tbody>
                                 {classRecapData.map(data => (
                                     <tr key={data.studentId} className="bg-white border-b hover:bg-slate-50">
-                                        <td className="px-6 py-4 font-semibold">
+                                        <td data-label="اسم الطالب" className="px-6 py-4 font-semibold">
                                           <button onClick={() => onStudentSelect(data.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
                                               {data.studentName}
                                           </button>
                                         </td>
-                                        <td className="px-6 py-4">{data.absentCount}</td>
-                                        <td className="px-6 py-4">{data.permissionCount}</td>
-                                        <td className="px-6 py-4">{data.sickCount}</td>
-                                        <td className="px-6 py-4 font-bold">{data.total}</td>
-                                        <td className="px-6 py-4 font-bold text-teal-600">{data.uniqueDays}</td>
+                                        <td data-label="غائب" className="px-6 py-4">{data.absentCount}</td>
+                                        <td data-label="إذن" className="px-6 py-4">{data.permissionCount}</td>
+                                        <td data-label="مرض" className="px-6 py-4">{data.sickCount}</td>
+                                        <td data-label="المجموع" className="px-6 py-4 font-bold">{data.total}</td>
+                                        <td data-label="مجموع الأيام" className="px-6 py-4 font-bold text-teal-600">{data.uniqueDays}</td>
                                     </tr>
                                 ))}
                             </tbody>

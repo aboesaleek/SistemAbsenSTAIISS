@@ -223,7 +223,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                     <div className="bg-white p-6 rounded-2xl shadow-lg border">
                         <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل الإذن</h3>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-right text-slate-600">
+                            <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                 <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                                     <tr>
                                         <th className="px-6 py-3">#</th>
@@ -237,11 +237,11 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                     {studentData.records.length > 0 ? (
                                         studentData.records.map((record, index) => (
                                             <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                                <td className="px-6 py-4">{index + 1}</td>
-                                                <td className="px-6 py-4 font-semibold">{record.date}</td>
-                                                <td className="px-6 py-4">{record.type}</td>
-                                                <td className="px-6 py-4">{record.numberOfDays}</td>
-                                                <td className="px-6 py-4 text-slate-500">{record.reason || '-'}</td>
+                                                <td data-label="#" className="px-6 py-4">{index + 1}</td>
+                                                <td data-label="التاريخ" className="px-6 py-4 font-semibold">{record.date}</td>
+                                                <td data-label="النوع" className="px-6 py-4">{record.type}</td>
+                                                <td data-label="عدد الأيام" className="px-6 py-4">{record.numberOfDays}</td>
+                                                <td data-label="البيان" className="px-6 py-4 text-slate-500">{record.reason || '-'}</td>
                                             </tr>
                                         ))
                                     ) : (

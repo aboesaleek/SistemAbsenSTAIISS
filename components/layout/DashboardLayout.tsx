@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
+import { MenuIcon } from '../icons/MenuIcon';
+import { Logo } from '../icons/Logo';
 
 export interface NavLinkItem {
   id: string;
@@ -17,20 +19,39 @@ interface DashboardLayoutProps {
 }
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navLinks, onLogout, dashboardTitle }) => {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-slate-100" dir="rtl">
+    <div className="relative min-h-screen md:flex bg-slate-100" dir="rtl">
+      {/* Sidebar - handles both mobile and desktop states */}
       <Sidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isDesktopCollapsed={isDesktopSidebarCollapsed}
+        onDesktopToggle={() => setDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
         navLinks={navLinks}
         onLogout={onLogout}
         dashboardTitle={dashboardTitle}
       />
-      <main className="flex-1 p-8 transition-all duration-300 relative overflow-y-auto">
-        {children}
-      </main>
+
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col w-full md:w-auto">
+        {/* Mobile Header */}
+        <header className="md:hidden sticky top-0 z-20 bg-white shadow-sm p-4 flex justify-between items-center no-print">
+          <div className="flex items-center gap-2">
+            <Logo className="h-8 w-8 text-teal-500" />
+            <span className="text-lg font-bold text-slate-700">{dashboardTitle}</span>
+          </div>
+          <button onClick={() => setMobileSidebarOpen(true)} className="p-2">
+            <MenuIcon className="w-6 h-6 text-slate-600" />
+          </button>
+        </header>
+        
+        <main className="flex-1 p-4 sm:p-6 md:p-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };

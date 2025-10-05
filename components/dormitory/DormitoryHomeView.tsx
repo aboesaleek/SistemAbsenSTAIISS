@@ -1,11 +1,8 @@
 import React from 'react';
 import { DormitoryViewType } from '../../pages/DormitoryDashboard';
-import { MedicalIcon } from '../icons/MedicalIcon';
-import { UsersIcon } from '../icons/UsersIcon';
-import { UserIcon } from '../icons/UserIcon';
-import { MoonIcon } from '../icons/MoonIcon';
 import { DocumentReportIcon } from '../icons/DocumentReportIcon';
 import { UserCircleIcon } from '../icons/UserCircleIcon';
+import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 
 interface DormitoryHomeViewProps {
   navigateTo: (view: DormitoryViewType) => void;
@@ -60,38 +57,17 @@ export const DormitoryHomeView: React.FC<DormitoryHomeViewProps> = ({ navigateTo
   return (
     <div className="max-w-6xl mx-auto space-y-16">
       <div>
-        <h2 className="text-4xl font-bold text-slate-800 mb-4 text-center">الوحدات الرئيسية</h2>
-        <p className="text-xl text-slate-600 mb-8 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4 text-center">الوحدات الرئيسية</h2>
+        <p className="text-lg md:text-xl text-slate-600 mb-8 text-center">
           ابدأ بتسجيل أذونات الطلاب للخروج أو العودة.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <MainModuleCard
-                icon={<MedicalIcon className="w-10 h-10" />}
-                title="إذن خروج للمريض"
-                description="تسجيل إذن للطالب الذي يحتاج إلى مغادرة المهجع لأسباب صحية."
-                onClick={() => navigateTo('sickLeave')}
-                gradient="from-red-500 to-orange-500"
-            />
-            <MainModuleCard
-                icon={<UsersIcon className="w-10 h-10" />}
-                title="إذن خروج جماعي"
-                description="تسجيل إذن لمجموعة من الطلاب للمغادرة معًا لنشاط مشترك."
-                onClick={() => navigateTo('groupLeave')}
-                gradient="from-sky-500 to-indigo-600"
-            />
-            <MainModuleCard
-                icon={<UserIcon className="w-10 h-10" />}
-                title="إذن خروج فردي"
-                description="تسجيل إذن طالب واحد للخروج لقضاء حوائج عامة أو شخصية."
-                onClick={() => navigateTo('individualLeave')}
-                gradient="from-emerald-500 to-teal-600"
-            />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
              <MainModuleCard
-                icon={<MoonIcon className="w-10 h-10" />}
-                title="إذن مبيت"
-                description="تسجيل إذن للطالب للمبيت خارج المهجع لليلة واحدة أو أكثر."
-                onClick={() => navigateTo('overnightLeave')}
-                gradient="from-slate-700 to-gray-800"
+                icon={<CheckCircleIcon className="w-10 h-10" />}
+                title="تسجيل الأذونات"
+                description="تسجيل جميع أنواع الأذونات للطلاب، سواء كانت فردية، جماعية، للمرض، أو للمبيت."
+                onClick={() => navigateTo('permissions')}
+                gradient="from-purple-500 to-indigo-600"
             />
         </div>
       </div>
