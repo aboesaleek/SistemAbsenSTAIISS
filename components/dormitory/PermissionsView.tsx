@@ -23,7 +23,7 @@ export const PermissionsView: React.FC = () => {
 
     // Search and Filter State
     const [searchQuery, setSearchQuery] = useState('');
-    const [dormFilter, setDormFilter] = useState('');
+    const [groupSelectedDormId, setGroupSelectedDormId] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
 
@@ -56,7 +56,7 @@ export const PermissionsView: React.FC = () => {
         setSelectedDormitoryId('');
         setSelectedStudentId('');
         setSelectedStudentIds(new Set());
-        setDormFilter('');
+        setGroupSelectedDormId('');
         setNumberOfDays(1);
         setReason('');
     }
@@ -78,12 +78,13 @@ export const PermissionsView: React.FC = () => {
     }, [searchQuery, students]);
 
     const groupLeaveStudents = useMemo(() => {
+        if (!groupSelectedDormId) return [];
         return students.filter(student => {
-            const matchesDorm = !dormFilter || student.dormitory_id === dormFilter;
+            const matchesDorm = student.dormitory_id === groupSelectedDormId;
             const matchesSearch = !searchQuery || student.name.toLowerCase().includes(searchQuery.toLowerCase());
             return matchesDorm && matchesSearch;
         });
-    }, [students, dormFilter, searchQuery]);
+    }, [students, groupSelectedDormId, searchQuery]);
 
 
     const handleStudentSearchSelect = (student: Student) => {
@@ -206,23 +207,28 @@ export const PermissionsView: React.FC = () => {
                     {permissionType === DormitoryPermissionType.GROUP_LEAVE ? (
                         <div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                                <input type="text" placeholder="بحث باسم الطالب..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg"/>
-                                <select value={dormFilter} onChange={e => setDormFilter(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
-                                    <option value="">-- تصفية حسب المهجع --</option>
+                                <input type="text" placeholder="بحث باسم الطالب..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg" disabled={!groupSelectedDormId} />
+                                <select value={groupSelectedDormId} onChange={e => { setGroupSelectedDormId(e.target.value); setSearchQuery(''); }} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                                    <option value="">-- اختر المهجع لعرض الطلاب --</option>
                                     {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                                 </select>
                             </div>
-                            <div className="max-h-60 overflow-y-auto border p-2 rounded-lg bg-slate-50">
-                                {groupLeaveStudents.length > 0 ? groupLeaveStudents.map(student => (
-                                    <label key={student.id} className="flex items-center justify-between gap-3 p-2 hover:bg-slate-100 rounded cursor-pointer">
-                                        <div>
-                                            <input type="checkbox" checked={selectedStudentIds.has(student.id)} onChange={() => handleStudentToggle(student.id)} className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-slate-400 mr-3"/>
-                                            {student.name}
-                                        </div>
-                                        <span className="text-sm text-slate-500">{dormitoriesMap.get(student.dormitory_id || '')}</span>
-                                    </label>
-                                )) : <p className="text-center text-slate-500 p-4">لم يتم العثور على طلاب.</p>}
-                            </div>
+                            {!groupSelectedDormId ? (
+                                <div className="text-center p-4 bg-slate-100 rounded-lg mt-2">
+                                    <p className="text-slate-600">اختر المهجع أعلاه لعرض قائمة الطلاب.</p>
+                                </div>
+                            ) : (
+                                <div className="max-h-60 overflow-y-auto border p-2 rounded-lg bg-slate-50 mt-2">
+                                    {groupLeaveStudents.length > 0 ? groupLeaveStudents.map(student => (
+                                        <label key={student.id} className="flex items-center justify-between gap-3 p-2 hover:bg-slate-100 rounded cursor-pointer">
+                                            <div>
+                                                <input type="checkbox" checked={selectedStudentIds.has(student.id)} onChange={() => handleStudentToggle(student.id)} className="w-5 h-5 text-purple-600 focus:ring-purple-500 border-slate-400 mr-3"/>
+                                                {student.name}
+                                            </div>
+                                        </label>
+                                    )) : <p className="text-center text-slate-500 p-4">لم يتم العثور على طلاب.</p>}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-4">
