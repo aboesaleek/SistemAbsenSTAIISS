@@ -12,8 +12,10 @@ import { DocumentReportIcon } from '../components/icons/DocumentReportIcon';
 import { ChartBarIcon } from '../components/icons/ChartBarIcon';
 import { StudentRecapView } from '../components/academic/StudentRecapView';
 import { UserCircleIcon } from '../components/icons/UserCircleIcon';
+import { FollowUpView } from '../components/academic/FollowUpView';
+import { CallingIcon } from '../components/icons/CallingIcon';
 
-export type AcademicViewType = 'home' | 'permissions' | 'attendance' | 'recap' | 'classRecap' | 'studentRecap';
+export type AcademicViewType = 'home' | 'permissions' | 'attendance' | 'followUp' | 'recap' | 'classRecap' | 'studentRecap';
 
 interface AcademicDashboardProps {
   onLogout: () => void;
@@ -36,6 +38,8 @@ export const AcademicDashboard: React.FC<AcademicDashboardProps> = ({ onLogout }
         return <PermissionsView />;
       case 'attendance':
         return <AttendanceView onStudentSelect={handleStudentSelectForRecap} />;
+      case 'followUp':
+        return <FollowUpView />;
       case 'recap':
         return <RecapView onStudentSelect={handleStudentSelectForRecap} />;
       case 'classRecap':
@@ -68,6 +72,13 @@ export const AcademicDashboard: React.FC<AcademicDashboardProps> = ({ onLogout }
       icon: <ClipboardListIcon className="w-6 h-6" />,
       isActive: currentView === 'attendance',
       onClick: () => setCurrentView('attendance'),
+    },
+    {
+      id: 'followUp',
+      label: 'متابعة الغياب',
+      icon: <CallingIcon className="w-6 h-6" />,
+      isActive: currentView === 'followUp',
+      onClick: () => setCurrentView('followUp'),
     },
     {
       id: 'recap',
