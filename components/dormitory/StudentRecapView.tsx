@@ -163,7 +163,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">ملخص الطالب</h2>
             
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input
                         type="text"
@@ -196,7 +196,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
 
             {studentData && (
                 <div className="space-y-6">
-                    <div className="p-6 bg-white rounded-2xl shadow-lg border">
+                    <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-lg border">
                         <h3 className="text-2xl font-bold text-slate-800 mb-4">{students.find(s=>s.id === selectedStudentId)?.name}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="flex flex-col justify-between space-y-4">
@@ -220,28 +220,28 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         </div>
                     </div>
                 
-                    <div className="bg-white p-6 rounded-2xl shadow-lg border">
+                    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border">
                         <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل الإذن</h3>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                 <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                                     <tr>
-                                        <th className="px-6 py-3">#</th>
-                                        <th className="px-6 py-3">التاريخ</th>
-                                        <th className="px-6 py-3">النوع</th>
-                                        <th className="px-6 py-3">عدد الأيام</th>
-                                        <th className="px-6 py-3">البيان</th>
+                                        <th className="px-6 py-3 whitespace-nowrap">#</th>
+                                        <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
+                                        <th className="px-6 py-3 whitespace-nowrap">النوع</th>
+                                        <th className="px-6 py-3 whitespace-nowrap">عدد الأيام</th>
+                                        <th className="px-6 py-3 whitespace-nowrap">البيان</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {studentData.records.length > 0 ? (
                                         studentData.records.map((record, index) => (
                                             <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                                <td data-label="#" className="px-6 py-4">{index + 1}</td>
-                                                <td data-label="التاريخ" className="px-6 py-4 font-semibold">{record.date}</td>
-                                                <td data-label="النوع" className="px-6 py-4">{record.type}</td>
-                                                <td data-label="عدد الأيام" className="px-6 py-4">{record.numberOfDays}</td>
-                                                <td data-label="البيان" className="px-6 py-4 text-slate-500">{record.reason || '-'}</td>
+                                                <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
+                                                <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
+                                                <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
+                                                <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.numberOfDays}</td>
+                                                <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
                                             </tr>
                                         ))
                                     ) : (

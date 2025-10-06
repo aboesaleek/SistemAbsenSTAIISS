@@ -6,7 +6,7 @@ import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-    <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
         <h3 className="text-xl font-bold text-slate-700 mb-4">{title}</h3>
         {children}
     </div>
@@ -22,8 +22,8 @@ const DataTable: React.FC<{
         <table className="w-full text-sm text-right text-slate-600 responsive-table">
             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                 <tr>
-                    {headers.map(h => <th key={h} className="px-6 py-3">{h}</th>)}
-                    <th className="px-6 py-3">إجراءات</th>
+                    {headers.map(h => <th key={h} className="px-6 py-3 whitespace-nowrap">{h}</th>)}
+                    <th className="px-6 py-3 whitespace-nowrap">إجراءات</th>
                 </tr>
             </thead>
             <tbody>
@@ -36,8 +36,8 @@ const DataTable: React.FC<{
                 ) : (
                     data.map((row, rowIndex) => (
                         <tr key={items[rowIndex].id} className="bg-white border-b hover:bg-slate-50">
-                            {row.map((cell, cellIndex) => <td key={cellIndex} data-label={headers[cellIndex]} className="px-6 py-4">{cell}</td>)}
-                            <td className="px-6 py-4 action-cell">
+                            {row.map((cell, cellIndex) => <td key={cellIndex} data-label={headers[cellIndex]} className="px-6 py-4 whitespace-nowrap">{cell}</td>)}
+                            <td className="px-6 py-4 action-cell whitespace-nowrap">
                                 <div className="flex gap-3 justify-end">
                                     <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
                                         <EditIcon className="w-5 h-5" />
@@ -57,6 +57,18 @@ const DataTable: React.FC<{
     </div>
 );
 
+const TabButton: React.FC<{ isActive: boolean; onClick: () => void; children: React.ReactNode }> = ({ isActive, onClick, children }) => (
+    <button
+        onClick={onClick}
+        className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors duration-200 focus:outline-none ${
+            isActive
+                ? 'border-teal-500 text-teal-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+        }`}
+    >
+        {children}
+    </button>
+);
 
 export const DormitoryView: React.FC = () => {
     const [dormitories, setDormitories] = useState<Dormitory[]>([]);
@@ -65,6 +77,7 @@ export const DormitoryView: React.FC = () => {
     const [isAddingDorm, setIsAddingDorm] = useState(false);
     const [isAddingStudent, setIsAddingStudent] = useState(false);
     const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+    const [activeTab, setActiveTab] = useState<'dormitories' | 'students'>('dormitories');
     
     const newDormsRef = useRef<HTMLTextAreaElement>(null);
     const newStudentsRef = useRef<HTMLTextAreaElement>(null);
@@ -201,22 +214,36 @@ export const DormitoryView: React.FC = () => {
                 </Card>
             </div>
             
-            <Card title="المهاجع الحالية">
-                <DataTable 
-                    headers={['#', 'اسم المهجع']} 
-                    data={dormitories.map((d, i) => [i + 1, d.name])}
-                    onDelete={(id) => handleDelete(id, 'dormitories')}
-                    items={dormitories}
-                />
-            </Card>
-            <Card title="الطلاب في المهاجع">
-                <DataTable 
-                    headers={['#', 'اسم الطالب', 'المهجع']} 
-                    data={students.map((s, i) => [i + 1, s.name, dormitories.find(d => d.id === s.dormitory_id)?.name || 'N/A'])}
-                    onDelete={(id) => handleDelete(id, 'students')}
-                    items={students}
-                />
-            </Card>
+            <div className="bg-white rounded-xl shadow-md border border-slate-200">
+                <div className="px-6 pt-4 border-b border-slate-200">
+                    <nav className="-mb-px flex gap-6" aria-label="Tabs">
+                        <TabButton isActive={activeTab === 'dormitories'} onClick={() => setActiveTab('dormitories')}>
+                            المهاجع الحالية
+                        </TabButton>
+                        <TabButton isActive={activeTab === 'students'} onClick={() => setActiveTab('students')}>
+                            الطلاب في المهاجع
+                        </TabButton>
+                    </nav>
+                </div>
+                <div className="p-4 sm:p-6">
+                    {activeTab === 'dormitories' && (
+                        <DataTable 
+                            headers={['#', 'اسم المهجع']} 
+                            data={dormitories.map((d, i) => [i + 1, d.name])}
+                            onDelete={(id) => handleDelete(id, 'dormitories')}
+                            items={dormitories}
+                        />
+                    )}
+                    {activeTab === 'students' && (
+                         <DataTable 
+                            headers={['#', 'اسم الطالب', 'المهجع']} 
+                            data={students.map((s, i) => [i + 1, s.name, dormitories.find(d => d.id === s.dormitory_id)?.name || 'N/A'])}
+                            onDelete={(id) => handleDelete(id, 'students')}
+                            items={students}
+                        />
+                    )}
+                </div>
+            </div>
         </div>
     );
 };

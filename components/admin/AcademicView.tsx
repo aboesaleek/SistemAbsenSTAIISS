@@ -6,7 +6,7 @@ import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-    <div className="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
         <h3 className="text-xl font-bold text-slate-700 mb-4">{title}</h3>
         {children}
     </div>
@@ -22,8 +22,8 @@ const DataTable: React.FC<{
         <table className="w-full text-sm text-right text-slate-600 responsive-table">
             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                 <tr>
-                    {headers.map(h => <th key={h} className="px-6 py-3">{h}</th>)}
-                    <th className="px-6 py-3">إجراءات</th>
+                    {headers.map(h => <th key={h} className="px-6 py-3 whitespace-nowrap">{h}</th>)}
+                    <th className="px-6 py-3 whitespace-nowrap">إجراءات</th>
                 </tr>
             </thead>
             <tbody>
@@ -36,8 +36,8 @@ const DataTable: React.FC<{
                 ) : (
                     data.map((row, rowIndex) => (
                         <tr key={items[rowIndex].id} className="bg-white border-b hover:bg-slate-50">
-                            {row.map((cell, cellIndex) => <td key={cellIndex} data-label={headers[cellIndex]} className="px-6 py-4">{cell}</td>)}
-                            <td className="px-6 py-4 action-cell">
+                            {row.map((cell, cellIndex) => <td key={cellIndex} data-label={headers[cellIndex]} className="px-6 py-4 whitespace-nowrap">{cell}</td>)}
+                            <td className="px-6 py-4 action-cell whitespace-nowrap">
                                 <div className="flex gap-3 justify-end">
                                     <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
                                         <EditIcon className="w-5 h-5" />
@@ -57,6 +57,18 @@ const DataTable: React.FC<{
     </div>
 );
 
+const TabButton: React.FC<{ isActive: boolean; onClick: () => void; children: React.ReactNode }> = ({ isActive, onClick, children }) => (
+    <button
+        onClick={onClick}
+        className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors duration-200 focus:outline-none ${
+            isActive
+                ? 'border-teal-500 text-teal-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+        }`}
+    >
+        {children}
+    </button>
+);
 
 export const AcademicView: React.FC = () => {
     const [classes, setClasses] = useState<Class[]>([]);
@@ -67,6 +79,7 @@ export const AcademicView: React.FC = () => {
     const [isAddingStudent, setIsAddingStudent] = useState(false);
     const [isAddingCourse, setIsAddingCourse] = useState(false);
     const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+    const [activeTab, setActiveTab] = useState<'classes' | 'students' | 'courses'>('classes');
 
 
     const newClassesRef = useRef<HTMLTextAreaElement>(null);
@@ -87,7 +100,6 @@ export const AcademicView: React.FC = () => {
             
             const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
             if (coursesError) throw coursesError;
-            setCourses(coursesData || []);
         } catch (error: any) {
             console.error('Error fetching academic data:', error);
             let errorMessage = 'An unknown error occurred.';
@@ -213,30 +225,47 @@ export const AcademicView: React.FC = () => {
                 </Card>
             </div>
             
-            <Card title="الفصول الدراسية الحالية">
-                <DataTable 
-                    headers={['#', 'اسم الفصل']} 
-                    data={classes.map((c, i) => [i + 1, c.name])}
-                    onDelete={(id) => handleDelete(id, 'classes')}
-                    items={classes}
-                />
-            </Card>
-            <Card title="الطلاب المسجلون">
-                <DataTable 
-                    headers={['#', 'اسم الطالب', 'الفصل الدراسي']} 
-                    data={students.map((s, i) => [i + 1, s.name, classes.find(c => c.id === s.class_id)?.name || 'N/A'])}
-                    onDelete={(id) => handleDelete(id, 'students')}
-                    items={students}
-                />
-            </Card>
-            <Card title="المواد الدراسية المتاحة">
-                <DataTable 
-                    headers={['#', 'اسم المادة']} 
-                    data={courses.map((c, i) => [i + 1, c.name])}
-                    onDelete={(id) => handleDelete(id, 'courses')}
-                    items={courses}
-                />
-            </Card>
+            <div className="bg-white rounded-xl shadow-md border border-slate-200">
+                <div className="px-6 pt-4 border-b border-slate-200">
+                    <nav className="-mb-px flex gap-6" aria-label="Tabs">
+                        <TabButton isActive={activeTab === 'classes'} onClick={() => setActiveTab('classes')}>
+                            الفصول الدراسية
+                        </TabButton>
+                        <TabButton isActive={activeTab === 'students'} onClick={() => setActiveTab('students')}>
+                            الطلاب المسجلون
+                        </TabButton>
+                        <TabButton isActive={activeTab === 'courses'} onClick={() => setActiveTab('courses')}>
+                            المواد الدراسية
+                        </TabButton>
+                    </nav>
+                </div>
+                <div className="p-4 sm:p-6">
+                    {activeTab === 'classes' && (
+                        <DataTable 
+                            headers={['#', 'اسم الفصل']} 
+                            data={classes.map((c, i) => [i + 1, c.name])}
+                            onDelete={(id) => handleDelete(id, 'classes')}
+                            items={classes}
+                        />
+                    )}
+                    {activeTab === 'students' && (
+                        <DataTable 
+                            headers={['#', 'اسم الطالب', 'الفصل الدراسي']} 
+                            data={students.map((s, i) => [i + 1, s.name, classes.find(c => c.id === s.class_id)?.name || 'N/A'])}
+                            onDelete={(id) => handleDelete(id, 'students')}
+                            items={students}
+                        />
+                    )}
+                    {activeTab === 'courses' && (
+                        <DataTable 
+                            headers={['#', 'اسم المادة']} 
+                            data={courses.map((c, i) => [i + 1, c.name])}
+                            onDelete={(id) => handleDelete(id, 'courses')}
+                            items={courses}
+                        />
+                    )}
+                </div>
+            </div>
         </div>
     );
 };

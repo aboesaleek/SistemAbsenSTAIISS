@@ -114,7 +114,7 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
        return (
          <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">ملخص الفصل</h2>
-             <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
                 <div className="text-center p-8">...جاري تحميل البيانات</div>
              </div>
         </div>
@@ -125,7 +125,7 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">ملخص الفصل</h2>
 
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
                 <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                      <div>
                         <label htmlFor="class-select-recap" className="block text-lg font-semibold text-slate-700 mb-2">اختر الفصل الدراسي</label>
@@ -140,7 +140,7 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                         </select>
                     </div>
                     {selectedClassId && (
-                         <button className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                         <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
                             <PrinterIcon className="w-5 h-5" />
                             <span>تصدير إلى PDF</span>
                         </button>
@@ -149,7 +149,7 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
             </div>
 
             {selectedClassId && (
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
                     <h3 className="text-xl font-bold text-slate-700 mb-4">
                         ملخص {classes.find(c => c.id === selectedClassId)?.name}
                     </h3>
@@ -158,27 +158,27 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                         <table className="w-full text-sm text-right text-slate-600 responsive-table">
                             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                                 <tr>
-                                    <th className="px-6 py-3">اسم الطالب</th>
-                                    <th className="px-6 py-3">غائب</th>
-                                    <th className="px-6 py-3">إذن</th>
-                                    <th className="px-6 py-3">مرض</th>
-                                    <th className="px-6 py-3">المجموع</th>
-                                    <th className="px-6 py-3">مجموع الأيام</th>
+                                    <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
+                                    <th className="px-6 py-3 whitespace-nowrap">غائب</th>
+                                    <th className="px-6 py-3 whitespace-nowrap">إذن</th>
+                                    <th className="px-6 py-3 whitespace-nowrap">مرض</th>
+                                    <th className="px-6 py-3 whitespace-nowrap">المجموع</th>
+                                    <th className="px-6 py-3 whitespace-nowrap">مجموع الأيام</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {classRecapData.map(data => (
                                     <tr key={data.studentId} className="bg-white border-b hover:bg-slate-50">
-                                        <td data-label="اسم الطالب" className="px-6 py-4 font-semibold">
+                                        <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
                                           <button onClick={() => onStudentSelect(data.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
                                               {data.studentName}
                                           </button>
                                         </td>
-                                        <td data-label="غائب" className="px-6 py-4">{data.absentCount}</td>
-                                        <td data-label="إذن" className="px-6 py-4">{data.permissionCount}</td>
-                                        <td data-label="مرض" className="px-6 py-4">{data.sickCount}</td>
-                                        <td data-label="المجموع" className="px-6 py-4 font-bold">{data.total}</td>
-                                        <td data-label="مجموع الأيام" className="px-6 py-4 font-bold text-teal-600">{data.uniqueDays}</td>
+                                        <td data-label="غائب" className="px-6 py-4 whitespace-nowrap">{data.absentCount}</td>
+                                        <td data-label="إذن" className="px-6 py-4 whitespace-nowrap">{data.permissionCount}</td>
+                                        <td data-label="مرض" className="px-6 py-4 whitespace-nowrap">{data.sickCount}</td>
+                                        <td data-label="المجموع" className="px-6 py-4 font-bold whitespace-nowrap">{data.total}</td>
+                                        <td data-label="مجموع الأيام" className="px-6 py-4 font-bold text-teal-600 whitespace-nowrap">{data.uniqueDays}</td>
                                     </tr>
                                 ))}
                             </tbody>

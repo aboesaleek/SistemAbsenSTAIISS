@@ -31,41 +31,10 @@
           display: none !important;
         }
       }
-      /* Responsive Table Styles */
-      @media screen and (max-width: 768px) {
-        .responsive-table {
-          @apply w-full block;
-        }
-        .responsive-table thead, 
-        .responsive-table tbody, 
-        .responsive-table th, 
-        .responsive-table td, 
-        .responsive-table tr {
-          @apply block;
-        }
-        .responsive-table thead tr {
-          @apply absolute -top-96 -left-96; /* Hide table headers */
-        }
-        .responsive-table tr {
-          @apply border border-slate-200 rounded-lg mb-4 shadow-sm;
-        }
-        .responsive-table td {
-          @apply border-none border-b border-slate-100 p-4 flex items-center justify-between text-right;
-        }
-        .responsive-table td:before {
-          content: attr(data-label);
-          @apply font-bold text-slate-800 pl-4 text-sm whitespace-nowrap;
-        }
-        .responsive-table td:last-child {
-          @apply border-b-0;
-        }
-        .responsive-table .action-cell {
-          @apply justify-start; /* Keep action buttons aligned */
-        }
-        .responsive-table .action-cell:before {
-          content: "إجراءات"; /* Add label for action cell */
-        }
-      }
+      /* 
+        Responsive table styles have been removed to favor horizontal scrolling.
+        Tables are now wrapped in a div with `overflow-x-auto` for a better mobile experience.
+      */
     </style>
   <script type="importmap">
 {

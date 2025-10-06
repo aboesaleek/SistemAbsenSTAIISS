@@ -98,7 +98,7 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
     }
     
     return (
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 printable-area">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 printable-area">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
                 <div className="no-print">
@@ -129,29 +129,29 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
                 <table className="w-full text-sm text-right text-slate-600 responsive-table">
                     <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                         <tr>
-                            <th className="px-6 py-3">#</th>
-                            <th className="px-6 py-3">اسم الطالب</th>
-                            <th className="px-6 py-3">المهجع</th>
-                            <th className="px-6 py-3">التاريخ</th>
-                            <th className="px-6 py-3">عدد الأيام</th>
-                            <th className="px-6 py-3">البيان</th>
-                            <th className="px-6 py-3 no-print">إجراء</th>
+                            <th className="px-6 py-3 whitespace-nowrap">#</th>
+                            <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
+                            <th className="px-6 py-3 whitespace-nowrap">المهجع</th>
+                            <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
+                            <th className="px-6 py-3 whitespace-nowrap">عدد الأيام</th>
+                            <th className="px-6 py-3 whitespace-nowrap">البيان</th>
+                            <th className="px-6 py-3 no-print whitespace-nowrap">إجراء</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredRecords.map((record, index) => (
                             <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                <td data-label="#" className="px-6 py-4">{index + 1}</td>
-                                <td data-label="اسم الطالب" className="px-6 py-4 font-semibold">
+                                <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
+                                <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
                                      <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">
                                         {record.studentName}
                                     </button>
                                 </td>
-                                <td data-label="المهجع" className="px-6 py-4">{record.dormitoryName}</td>
-                                <td data-label="التاريخ" className="px-6 py-4">{record.date}</td>
-                                <td data-label="عدد الأيام" className="px-6 py-4">{record.numberOfDays}</td>
-                                <td data-label="البيان" className="px-6 py-4 text-slate-500">{record.reason || '-'}</td>
-                                <td className="px-6 py-4 no-print action-cell">
+                                <td data-label="المهجع" className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
+                                <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
+                                <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.numberOfDays}</td>
+                                <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
+                                <td className="px-6 py-4 no-print action-cell whitespace-nowrap">
                                     <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800">
                                         <DeleteIcon className="w-5 h-5" />
                                     </button>
@@ -187,7 +187,7 @@ export const GeneralRecapView: React.FC<GeneralRecapViewProps> = ({ onStudentSel
     return (
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">الخلاصة العامة</h2>
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 no-print">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 no-print">
                 <label htmlFor="recap-select" className="block text-lg font-semibold text-slate-700 mb-2">اختر نوع الخلاصة</label>
                 <select
                     id="recap-select"

@@ -134,7 +134,7 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">الملخص العام</h2>
             
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <input
                         type="text"
@@ -164,42 +164,42 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
                         className="w-full p-2 border border-slate-300 rounded-lg"
                     />
                 </div>
-                <button className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
                     <DownloadIcon className="w-5 h-5" />
                     <span>تصدير إلى Excel</span>
                 </button>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                         <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                             <tr>
-                                <th className="px-6 py-3">#</th>
-                                <th className="px-6 py-3">اسم الطالب</th>
-                                <th className="px-6 py-3">الفصل</th>
-                                <th className="px-6 py-3">التاريخ</th>
-                                <th className="px-6 py-3">الحالة</th>
-                                <th className="px-6 py-3">إجراء</th>
+                                <th className="px-6 py-3 whitespace-nowrap">#</th>
+                                <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
+                                <th className="px-6 py-3 whitespace-nowrap">الفصل</th>
+                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
+                                <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
+                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredRecords.map((record, index) => (
                                 <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                    <td data-label="#" className="px-6 py-4">{index + 1}</td>
-                                    <td data-label="اسم الطالب" className="px-6 py-4 font-semibold">
+                                    <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
+                                    <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
                                       <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
                                           {record.studentName}
                                       </button>
                                     </td>
-                                    <td data-label="الفصل" className="px-6 py-4">{record.className}</td>
-                                    <td data-label="التاريخ" className="px-6 py-4">{record.date}</td>
-                                    <td data-label="الحالة" className="px-6 py-4">
+                                    <td data-label="الفصل" className="px-6 py-4 whitespace-nowrap">{record.className}</td>
+                                    <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
+                                    <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColorMap[record.status]}`}>
                                             {record.status}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 action-cell">
+                                    <td className="px-6 py-4 action-cell whitespace-nowrap">
                                         <button onClick={() => deleteRecord(record)} className="text-red-600 hover:text-red-800">
                                             <DeleteIcon className="w-5 h-5" />
                                         </button>

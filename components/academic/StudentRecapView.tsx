@@ -156,6 +156,9 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         const permissionRecords = records.filter(r => r.status === RecapStatus.PERMISSION);
         const sickRecords = records.filter(r => r.status === RecapStatus.SICK);
         const uniqueDays = new Set(records.map(r => r.date)).size;
+        
+        const allEvents = [...permissionRecords, ...sickRecords]
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const absenceDetailsByCourse = new Map<string, string[]>();
         absentRecords.forEach(record => {
@@ -176,7 +179,8 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             permissionRecords,
             sickRecords,
             uniqueDays,
-            absenceDetailsByCourse
+            absenceDetailsByCourse,
+            allEvents,
         };
     }, [selectedStudentId, allRecords]);
 
@@ -199,7 +203,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">ملخص الطالب</h2>
             
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input
                         type="text"
@@ -232,7 +236,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
 
             {studentData && (
                 <div className="space-y-6">
-                    <div className="p-6 bg-white rounded-2xl shadow-lg border">
+                    <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-lg border">
                         <h3 className="text-2xl font-bold text-slate-800 mb-4">{students.find(s=>s.id === selectedStudentId)?.name}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="flex flex-col justify-between space-y-4">
@@ -254,56 +258,67 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         </div>
                     </div>
                 
-                    <div className="bg-white p-6 rounded-2xl shadow-lg border">
+                    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border">
                         <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل السجل</h3>
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="bg-blue-50/70 p-4 rounded-lg border border-blue-200/80">
-                                    <h4 className="font-bold text-blue-800 mb-2 border-b-2 border-blue-200 pb-2">سجل الإذن</h4>
-                                    <ul className="space-y-2 text-sm text-blue-900">
-                                        {studentData.permissionRecords.length > 0 ? studentData.permissionRecords.map(r => (
-                                            <li key={r.id}><strong>{r.date}</strong></li>
-                                        )) : <li className="text-slate-500">لا يوجد</li>}
-                                    </ul>
-                                </div>
-                                <div className="bg-yellow-50/70 p-4 rounded-lg border border-yellow-200/80">
-                                    <h4 className="font-bold text-yellow-800 mb-2 border-b-2 border-yellow-200 pb-2">سجل المرض</h4>
-                                    <ul className="space-y-2 text-sm text-yellow-900">
-                                        {studentData.sickRecords.length > 0 ? studentData.sickRecords.map(r => (
-                                            <li key={r.id}><strong>{r.date}</strong></li>
-                                        )) : <li className="text-slate-500">لا يوجد</li>}
-                                    </ul>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="text-lg font-bold text-slate-700 mb-3">غياب</h4>
-                                <div className="overflow-x-auto border border-red-200 rounded-lg">
-                                    <table className="w-full text-sm text-right text-slate-600 responsive-table">
-                                        <thead className="text-xs text-red-800 uppercase bg-red-100">
-                                            <tr>
-                                                <th className="px-4 py-3">المادة الدراسية</th>
-                                                <th className="px-4 py-3">الغياب الأول</th>
-                                                <th className="px-4 py-3">الغياب الثاني</th>
-                                                <th className="px-4 py-3">الغياب الثالث</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {studentData.absenceDetailsByCourse.size > 0 ? (
-                                                Array.from(studentData.absenceDetailsByCourse.entries()).map(([course, dates]) => (
-                                                    <tr key={course} className="bg-white border-b border-red-100 last:border-b-0 hover:bg-red-50/50">
-                                                        <td data-label="المادة الدراسية" className="px-4 py-3 font-semibold">{course}</td>
-                                                        <td data-label="الغياب الأول" className="px-4 py-3">{dates[0] || '-'}</td>
-                                                        <td data-label="الغياب الثاني" className="px-4 py-3">{dates[1] || '-'}</td>
-                                                        <td data-label="الغياب الثالث" className="px-4 py-3">{dates[2] || '-'}</td>
+                               <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <h4 className="font-bold text-slate-800 mb-2 border-b-2 border-slate-200 pb-2">سجل الإذن والمرض</h4>
+                                     <div className="overflow-y-auto max-h-48">
+                                        <table className="w-full text-sm text-right">
+                                            <tbody>
+                                                {studentData.allEvents.length > 0 ? studentData.allEvents.map(event => (
+                                                    <tr key={event.id} className="border-b border-slate-200/50 last:border-0">
+                                                        <td className="py-2 pr-2 font-semibold whitespace-nowrap">{event.date}</td>
+                                                        <td className="py-2 pl-2 whitespace-nowrap">
+                                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                                                event.status === RecapStatus.SICK 
+                                                                ? 'bg-yellow-100 text-yellow-800'
+                                                                : 'bg-blue-100 text-blue-800'
+                                                            }`}>
+                                                                {event.status}
+                                                            </span>
+                                                        </td>
                                                     </tr>
-                                                ))
-                                            ) : (
+                                                )) : (
+                                                    <tr>
+                                                        <td className="text-slate-500 text-center py-4">لا يوجد سجل</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                     </div>
+                                </div>
+                                <div>
+                                    <h4 className="text-lg font-bold text-slate-700 mb-3">تفاصيل الغياب حسب المادة</h4>
+                                    <div className="overflow-x-auto border border-red-200 rounded-lg">
+                                        <table className="w-full text-sm text-right text-slate-600 responsive-table">
+                                            <thead className="text-xs text-red-800 uppercase bg-red-100">
                                                 <tr>
-                                                    <td colSpan={4} className="text-center py-6 text-slate-500">لا يوجد سجل غياب.</td>
+                                                    <th className="px-4 py-3 whitespace-nowrap">المادة الدراسية</th>
+                                                    <th className="px-4 py-3 whitespace-nowrap">الغياب الأول</th>
+                                                    <th className="px-4 py-3 whitespace-nowrap">الغياب الثاني</th>
+                                                    <th className="px-4 py-3 whitespace-nowrap">الغياب الثالث</th>
                                                 </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {studentData.absenceDetailsByCourse.size > 0 ? (
+                                                    Array.from(studentData.absenceDetailsByCourse.entries()).map(([course, dates]) => (
+                                                        <tr key={course} className="bg-white border-b border-red-100 last:border-b-0 hover:bg-red-50/50">
+                                                            <td data-label="المادة الدراسية" className="px-4 py-3 font-semibold whitespace-nowrap">{course}</td>
+                                                            <td data-label="الغياب الأول" className="px-4 py-3 whitespace-nowrap">{dates[0] || '-'}</td>
+                                                            <td data-label="الغياب الثاني" className="px-4 py-3 whitespace-nowrap">{dates[1] || '-'}</td>
+                                                            <td data-label="الغياب الثالث" className="px-4 py-3 whitespace-nowrap">{dates[2] || '-'}</td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={4} className="text-center py-6 text-slate-500">لا يوجد سجل غياب.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>

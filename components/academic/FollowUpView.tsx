@@ -122,7 +122,7 @@ export const FollowUpView: React.FC = () => {
     return (
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">متابعة الغياب</h2>
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
                 <p className="text-slate-600 mb-4">
                     تحتوي هذه القائمة على الطلاب الذين تم وضع علامة "غائب" عليهم من وحدة الحضور والغياب.
                     انقر فوق <b className="text-green-600">تأكيد</b> لإخفاء الطالب من هذه القائمة (تبقى البيانات في الملخصات).
@@ -132,24 +132,24 @@ export const FollowUpView: React.FC = () => {
                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                         <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                            <tr>
-                                <th className="px-6 py-3">#</th>
-                                <th className="px-6 py-3">اسم الطالب</th>
-                                <th className="px-6 py-3">الفصل</th>
-                                <th className="px-6 py-3">تاريخ الغياب</th>
-                                <th className="px-6 py-3">المادة الدراسية</th>
-                                <th className="px-6 py-3">إجراءات</th>
+                                <th className="px-6 py-3 whitespace-nowrap">#</th>
+                                <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
+                                <th className="px-6 py-3 whitespace-nowrap">الفصل</th>
+                                <th className="px-6 py-3 whitespace-nowrap">تاريخ الغياب</th>
+                                <th className="px-6 py-3 whitespace-nowrap">المادة الدراسية</th>
+                                <th className="px-6 py-3 whitespace-nowrap">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
                             {absences.length > 0 ? (
                                 absences.map((record, index) => (
                                     <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                        <td data-label="#" className="px-6 py-4">{index + 1}</td>
-                                        <td data-label="اسم الطالب" className="px-6 py-4 font-semibold">{record.studentName}</td>
-                                        <td data-label="الفصل" className="px-6 py-4">{record.className}</td>
-                                        <td data-label="تاريخ الغياب" className="px-6 py-4">{record.date}</td>
-                                        <td data-label="المادة الدراسية" className="px-6 py-4">{record.courseName}</td>
-                                        <td className="px-6 py-4 action-cell">
+                                        <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
+                                        <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">{record.studentName}</td>
+                                        <td data-label="الفصل" className="px-6 py-4 whitespace-nowrap">{record.className}</td>
+                                        <td data-label="تاريخ الغياب" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
+                                        <td data-label="المادة الدراسية" className="px-6 py-4 whitespace-nowrap">{record.courseName}</td>
+                                        <td className="px-6 py-4 action-cell whitespace-nowrap">
                                             <div className="flex gap-4 justify-end md:justify-start">
                                                 <button onClick={() => handleConfirm(record.id)} className="text-green-600 hover:text-green-800" title="تأكيد المتابعة">
                                                     <CheckIcon className="w-5 h-5" />
