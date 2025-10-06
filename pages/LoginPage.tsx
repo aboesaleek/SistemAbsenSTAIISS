@@ -101,12 +101,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       className="min-h-screen bg-slate-100 text-slate-800 flex flex-col items-center justify-center p-4"
       style={{ 
         backgroundImage: calligraphyPattern,
-        backgroundSize: '150px' 
+        backgroundSize: '100px' 
       }}
     >
-      <div className="w-full max-w-md mx-auto space-y-6">
+      <div className="w-full max-w-md mx-auto space-y-4 sm:space-y-6">
         <div className="text-center space-y-2">
-          <Logo className="mx-auto text-teal-500 h-20 w-20" />
+          <Logo className="mx-auto text-teal-500 h-14 w-14 sm:h-20 sm:w-20" />
           <h1 className="text-2xl sm:text-3xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">
             نظام كشف الغياب والأذونات
           </h1>
@@ -115,10 +115,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           </p>
         </div>
 
-        <div className="bg-white/60 backdrop-blur-lg p-6 sm:p-8 rounded-2xl border border-white/50 shadow-2xl space-y-8">
+        <div className="bg-white/60 backdrop-blur-lg p-6 sm:p-8 rounded-2xl border border-white/50 shadow-2xl space-y-4 sm:space-y-6">
           <ModeToggle currentMode={mode} onModeChange={setMode} />
           
-          <form className="space-y-6" onSubmit={handleFormSubmit}>
+          <form className="space-y-4 sm:space-y-6" onSubmit={handleFormSubmit}>
             {errorMessage && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-center" role="alert">
                     <span className="block sm:inline">{errorMessage}</span>

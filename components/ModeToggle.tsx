@@ -16,7 +16,7 @@ const ModeToggleButton: React.FC<{
   label: string;
 }> = ({ isActive, onClick, icon, label }) => {
   const baseClasses =
-    'flex-1 flex items-center justify-center gap-2 p-3 rounded-lg cursor-pointer transition-all duration-300 transform text-sm';
+    'flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg cursor-pointer transition-all duration-300 transform text-sm';
   const activeClasses = 'bg-teal-500 text-white border border-teal-500/50 shadow-lg scale-105';
   const inactiveClasses = 'bg-slate-200/60 text-slate-600 hover:bg-slate-300/70 hover:text-slate-800';
 
@@ -30,7 +30,7 @@ const ModeToggleButton: React.FC<{
 
 export const ModeToggle: React.FC<ModeToggleProps> = ({ currentMode, onModeChange }) => {
   return (
-    <div className="w-full flex gap-2 p-2 bg-black/5 rounded-xl border border-white/20">
+    <div className="w-full flex gap-1.5 p-1.5 bg-black/5 rounded-xl border border-white/20">
       <ModeToggleButton
         isActive={currentMode === AppMode.ACADEMIC}
         onClick={() => onModeChange(AppMode.ACADEMIC)}
