@@ -38,15 +38,21 @@ const TodayRecordsTable: React.FC<TodayRecordsTableProps> = ({ records, onStuden
                         </tr>
                     </thead>
                     <tbody className="bg-white">
-                        {records.map((record) => (
-                            <tr key={record.id} className="border-b hover:bg-slate-50">
-                                <td className="px-6 py-4 font-semibold whitespace-nowrap">
-                                    <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">{record.studentName}</button>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
-                                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColorMap[record.status].bg} ${statusColorMap[record.status].text}`}>{ceremonyStatusToLabel[record.status]}</span></td>
-                            </tr>
-                        ))}
+                        {records.map((record) => {
+                            // Defensive coding: Provide a fallback in case record.status is an unexpected value
+                            const statusInfo = statusColorMap[record.status] || statusColorMap[CeremonyStatus.ALPHA];
+                            const statusLabel = ceremonyStatusToLabel[record.status] || ceremonyStatusToLabel[CeremonyStatus.ALPHA];
+                            
+                            return (
+                                <tr key={record.id} className="border-b hover:bg-slate-50">
+                                    <td className="px-6 py-4 font-semibold whitespace-nowrap">
+                                        <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">{record.studentName}</button>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusInfo.bg} ${statusInfo.text}`}>{statusLabel}</span></td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

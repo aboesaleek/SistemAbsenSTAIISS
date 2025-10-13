@@ -57,8 +57,6 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
     }
 
-    const headers = ['#', 'اسم الطالب', 'المهجع', 'التاريخ', type === 'prayer' ? 'الصلاة' : 'الحالة'];
-
     return (
         <div className="space-y-4">
             <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
@@ -75,7 +73,12 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
                 <table className="w-full text-sm text-right text-slate-600 responsive-table">
                     <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                         <tr>
-                            {headers.map(h => <th key={h} className="px-6 py-3 whitespace-nowrap">{h}</th>)}
+                            <th className="px-6 py-3 whitespace-nowrap">#</th>
+                            <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
+                            <th className="px-6 py-3 whitespace-nowrap">المهجع</th>
+                            <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
+                            {type === 'prayer' && <th className="px-6 py-3 whitespace-nowrap">الصلاة</th>}
+                            <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
                             <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
                         </tr>
                     </thead>
@@ -88,8 +91,10 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
                                 </td>
                                 <td data-label="المهجع" className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
                                 <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
-                                {/* FIX: Use type assertion to access properties on the union type correctly. */}
-                                <td data-label={headers[4]} className="px-6 py-4 whitespace-nowrap">{type === 'prayer' ? (record as DormitoryPrayerAbsence).prayer : ceremonyStatusToLabel[(record as DormitoryCeremonyAbsence).status]}</td>
+                                {type === 'prayer' && (
+                                    <td data-label="الصلاة" className="px-6 py-4 whitespace-nowrap">{(record as DormitoryPrayerAbsence).prayer}</td>
+                                )}
+                                <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[type === 'prayer' ? (record as DormitoryPrayerAbsence).status : (record as DormitoryCeremonyAbsence).status]}</td>
                                 <td className="px-6 py-4 action-cell whitespace-nowrap">
                                     <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                 </td>

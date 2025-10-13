@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Dormitory, Student, DormitoryPermission, DormitoryPermissionType, Prayer, CeremonyStatus, ceremonyStatusToLabel } from '../../types';
+import { DormitoryPermissionType, CeremonyStatus, ceremonyStatusToLabel } from '../../types';
 import { supabase } from '../../supabaseClient';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
@@ -71,7 +71,7 @@ const DonutChart: React.FC<{ title: string; data: { label: string; value: number
 };
 
 const MainTabButton: React.FC<{ isActive: boolean; onClick: () => void; children: React.ReactNode; }> = ({ isActive, onClick, children }) => (
-    <button onClick={onClick} className={`px-6 py-3 text-lg font-bold transition-colors duration-200 focus:outline-none ${isActive ? 'border-b-4 border-purple-600 text-purple-700' : 'text-slate-500 hover:text-slate-800'}`}>
+    <button onClick={onClick} className={`px-4 sm:px-6 py-3 text-base sm:text-lg font-bold transition-colors duration-200 focus:outline-none text-center ${isActive ? 'border-b-4 border-purple-600 text-purple-700' : 'text-slate-500 hover:text-slate-800'}`}>
         {children}
     </button>
 );
@@ -86,7 +86,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState(preselectedStudentId || '');
-    const [activeTab, setActiveTab] = useState<'permissions' | 'absences'>('permissions');
+    const [activeTab, setActiveTab] = useState<'permissions' | 'prayerAbsences' | 'ceremonyAbsences'>('permissions');
 
     const deleteAbsenceRecord = async (id: string, type: 'prayer' | 'ceremony') => {
         const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
@@ -135,37 +135,29 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         };
     }, [selectedStudentId, permissionRecords]);
     
-    const absenceData = useMemo(() => {
+    const prayerAbsenceData = useMemo(() => {
         if (!selectedStudentId) return null;
-        
-        const prayerRecords = prayerAbsences.filter(r => r.studentId === selectedStudentId);
-        const ceremonyRecords = ceremonyAbsences.filter(r => r.studentId === selectedStudentId);
-
-        const combinedAbsenceRecords = [
-            ...prayerRecords.map(r => ({
-                id: r.id,
-                date: r.date,
-                type: 'غياب الصلاة',
-                details: r.prayer as Prayer,
-                sourceTable: 'prayer' as const
-            })),
-            ...ceremonyRecords.map(r => ({
-                id: r.id,
-                date: r.date,
-                type: 'غياب المراسم',
-                details: ceremonyStatusToLabel[r.status as CeremonyStatus],
-                sourceTable: 'ceremony' as const
-            }))
-        ].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
+        const records = prayerAbsences.filter(r => r.studentId === selectedStudentId);
         return {
-            combinedAbsenceRecords,
-            totalPrayer: prayerRecords.length,
-            totalCeremony: ceremonyRecords.length,
-            totalAbsences: prayerRecords.length + ceremonyRecords.length,
+            records: records.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+            totalAlpha: records.filter(r => r.status === CeremonyStatus.ALPHA).length,
+            totalIzin: records.filter(r => r.status === CeremonyStatus.IZIN).length,
+            totalSakit: records.filter(r => r.status === CeremonyStatus.SAKIT).length,
+            total: records.length,
         };
-    }, [selectedStudentId, prayerAbsences, ceremonyAbsences]);
-
+    }, [selectedStudentId, prayerAbsences]);
+    
+    const ceremonyAbsenceData = useMemo(() => {
+        if (!selectedStudentId) return null;
+        const records = ceremonyAbsences.filter(r => r.studentId === selectedStudentId);
+        return {
+            records: records.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+            totalAlpha: records.filter(r => r.status === CeremonyStatus.ALPHA).length,
+            totalIzin: records.filter(r => r.status === CeremonyStatus.IZIN).length,
+            totalSakit: records.filter(r => r.status === CeremonyStatus.SAKIT).length,
+            total: records.length,
+        };
+    }, [selectedStudentId, ceremonyAbsences]);
 
     const filteredStudents = useMemo(() => {
         let result = students;
@@ -221,7 +213,8 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
                     <div className="flex justify-center border-b">
                         <MainTabButton isActive={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')}>ملخص الأذونات</MainTabButton>
-                        <MainTabButton isActive={activeTab === 'absences'} onClick={() => setActiveTab('absences')}>ملخص الغياب</MainTabButton>
+                        <MainTabButton isActive={activeTab === 'prayerAbsences'} onClick={() => setActiveTab('prayerAbsences')}>غياب الصلاة</MainTabButton>
+                        <MainTabButton isActive={activeTab === 'ceremonyAbsences'} onClick={() => setActiveTab('ceremonyAbsences')}>غياب المراسم</MainTabButton>
                     </div>
 
                     {activeTab === 'permissions' && permissionData && (
@@ -268,7 +261,6 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
                                                         <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
                                                         <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
-                                                        {/* FIX: Changed record.number_of_days to record.number_of_days, which is now correct after type update */}
                                                         <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.number_of_days}</td>
                                                         <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
                                                         <td className="px-6 py-4 action-cell whitespace-nowrap">
@@ -288,53 +280,110 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         </div>
                     )}
                     
-                    {activeTab === 'absences' && absenceData && (
+                    {activeTab === 'prayerAbsences' && prayerAbsenceData && (
                         <div className="p-4 sm:p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="flex flex-col justify-between space-y-4">
                                     <div className="text-center p-6 bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-xl shadow-xl">
-                                        <p className="text-lg font-semibold">مجموع الغيابات</p>
-                                        <p className="text-7xl font-extrabold tracking-tighter">{absenceData.totalAbsences}</p>
+                                        <p className="text-lg font-semibold">مجموع غياب الصلاة</p>
+                                        <p className="text-7xl font-extrabold tracking-tighter">{prayerAbsenceData.total}</p>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <StatCard label="غياب الصلاة" value={absenceData.totalPrayer} gradient="from-sky-500 to-indigo-600" />
-                                        <StatCard label="غياب المراسم" value={absenceData.totalCeremony} gradient="from-rose-500 to-pink-600" />
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <StatCard label="غائب" value={prayerAbsenceData.totalAlpha} gradient="from-red-500 to-orange-500" />
+                                        <StatCard label="إذن" value={prayerAbsenceData.totalIzin} gradient="from-blue-500 to-sky-500" />
+                                        <StatCard label="مرض" value={prayerAbsenceData.totalSakit} gradient="from-yellow-400 to-yellow-500" />
                                     </div>
                                 </div>
-                                <DonutChart title="ملخص الغياب" data={[
-                                    {label: 'غياب الصلاة', value: absenceData.totalPrayer, color: 'text-sky-500', bgColor: 'bg-sky-500'},
-                                    {label: 'غياب المراسم', value: absenceData.totalCeremony, color: 'text-rose-500', bgColor: 'bg-rose-500'},
+                                <DonutChart title="ملخص غياب الصلاة" data={[
+                                    {label: 'غائب', value: prayerAbsenceData.totalAlpha, color: 'text-red-500', bgColor: 'bg-red-500'},
+                                    {label: 'إذن', value: prayerAbsenceData.totalIzin, color: 'text-blue-500', bgColor: 'bg-blue-500'},
+                                    {label: 'مرض', value: prayerAbsenceData.totalSakit, color: 'text-yellow-500', bgColor: 'bg-yellow-500'},
                                 ]} />
                             </div>
                         
                             <div>
-                                <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل الغياب</h3>
+                                <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل غياب الصلاة</h3>
                                 <div className="overflow-x-auto max-h-96 border rounded-lg">
                                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
                                                 <th className="px-6 py-3 whitespace-nowrap">#</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">النوع</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">التفاصيل</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">الصلاة</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
-                                            {absenceData.combinedAbsenceRecords.length > 0 ? (
-                                                absenceData.combinedAbsenceRecords.map((record, index) => (
+                                            {prayerAbsenceData.records.length > 0 ? (
+                                                prayerAbsenceData.records.map((record, index) => (
                                                     <tr key={record.id} className="border-b hover:bg-slate-50">
                                                         <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
                                                         <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
-                                                        <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
-                                                        <td data-label="التفاصيل" className="px-6 py-4 whitespace-nowrap">{record.details}</td>
+                                                        <td data-label="الصلاة" className="px-6 py-4 whitespace-nowrap">{record.prayer}</td>
+                                                        <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
                                                         <td className="px-6 py-4 action-cell whitespace-nowrap">
-                                                            <button onClick={() => deleteAbsenceRecord(record.id, record.sourceTable)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                                            <button onClick={() => deleteAbsenceRecord(record.id, 'prayer')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
                                                 ))
                                             ) : (
-                                                <tr><td colSpan={5} className="text-center py-8 text-slate-500">لا يوجد سجل غياب لهذا الطالب.</td></tr>
+                                                <tr><td colSpan={5} className="text-center py-8 text-slate-500">لا يوجد سجل غياب صلاة لهذا الطالب.</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'ceremonyAbsences' && ceremonyAbsenceData && (
+                        <div className="p-4 sm:p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="flex flex-col justify-between space-y-4">
+                                    <div className="text-center p-6 bg-gradient-to-br from-rose-500 to-pink-600 text-white rounded-xl shadow-xl">
+                                        <p className="text-lg font-semibold">مجموع غياب المراسم</p>
+                                        <p className="text-7xl font-extrabold tracking-tighter">{ceremonyAbsenceData.total}</p>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <StatCard label="غائب" value={ceremonyAbsenceData.totalAlpha} gradient="from-red-500 to-orange-500" />
+                                        <StatCard label="إذن" value={ceremonyAbsenceData.totalIzin} gradient="from-blue-500 to-sky-500" />
+                                        <StatCard label="مرض" value={ceremonyAbsenceData.totalSakit} gradient="from-yellow-400 to-yellow-500" />
+                                    </div>
+                                </div>
+                                <DonutChart title="ملخص غياب المراسم" data={[
+                                    {label: 'غائب', value: ceremonyAbsenceData.totalAlpha, color: 'text-red-500', bgColor: 'bg-red-500'},
+                                    {label: 'إذن', value: ceremonyAbsenceData.totalIzin, color: 'text-blue-500', bgColor: 'bg-blue-500'},
+                                    {label: 'مرض', value: ceremonyAbsenceData.totalSakit, color: 'text-yellow-500', bgColor: 'bg-yellow-500'},
+                                ]} />
+                            </div>
+                        
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل غياب المراسم</h3>
+                                <div className="overflow-x-auto max-h-96 border rounded-lg">
+                                    <table className="w-full text-sm text-right text-slate-600 responsive-table">
+                                        <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
+                                            <tr>
+                                                <th className="px-6 py-3 whitespace-nowrap">#</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white">
+                                            {ceremonyAbsenceData.records.length > 0 ? (
+                                                ceremonyAbsenceData.records.map((record, index) => (
+                                                    <tr key={record.id} className="border-b hover:bg-slate-50">
+                                                        <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
+                                                        <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
+                                                        <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
+                                                        <td className="px-6 py-4 action-cell whitespace-nowrap">
+                                                            <button onClick={() => deleteAbsenceRecord(record.id, 'ceremony')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr><td colSpan={4} className="text-center py-8 text-slate-500">لا يوجد سجل غياب مراسم لهذا الطالب.</td></tr>
                                             )}
                                         </tbody>
                                     </table>

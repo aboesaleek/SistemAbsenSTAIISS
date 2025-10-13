@@ -1,8 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Prayer, DormitoryPrayerAbsence } from '../../types';
+import { Prayer, DormitoryPrayerAbsence, CeremonyStatus, ceremonyStatusToLabel } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
+
+const statusColorMap: { [key in CeremonyStatus]: { bg: string, text: string, border: string } } = {
+  [CeremonyStatus.ALPHA]: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-500' },
+  [CeremonyStatus.SAKIT]: { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-500' },
+  [CeremonyStatus.IZIN]: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-500' },
+};
 
 interface TodayRecordsTableProps {
   records: DormitoryPrayerAbsence[];
@@ -29,20 +35,32 @@ const TodayRecordsTable: React.FC<TodayRecordsTableProps> = ({ records, onStuden
                             <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
                             <th className="px-6 py-3 whitespace-nowrap">المهجع</th>
                             <th className="px-6 py-3 whitespace-nowrap">الصلاة</th>
+                            <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
-                        {records.map((record) => (
-                            <tr key={record.id} className="border-b hover:bg-slate-50">
-                                <td className="px-6 py-4 font-semibold whitespace-nowrap">
-                                    <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">
-                                        {record.studentName}
-                                    </button>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">{record.prayer}</td>
-                            </tr>
-                        ))}
+                        {records.map((record) => {
+                            // Defensive coding: Provide a fallback in case record.status is an unexpected value
+                            const statusInfo = statusColorMap[record.status] || statusColorMap[CeremonyStatus.ALPHA];
+                            const statusLabel = ceremonyStatusToLabel[record.status] || ceremonyStatusToLabel[CeremonyStatus.ALPHA];
+
+                            return (
+                                <tr key={record.id} className="border-b hover:bg-slate-50">
+                                    <td className="px-6 py-4 font-semibold whitespace-nowrap">
+                                        <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">
+                                            {record.studentName}
+                                        </button>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">{record.prayer}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusInfo.bg} ${statusInfo.text}`}>
+                                            {statusLabel}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -60,7 +78,7 @@ export const PrayerAbsenceView: React.FC<PrayerAbsenceViewProps> = ({ onStudentS
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [selectedPrayer, setSelectedPrayer] = useState<Prayer>(Prayer.SUBUH);
-    const [markedAsAbsent, setMarkedAsAbsent] = useState<Set<string>>(new Set());
+    const [studentStatuses, setStudentStatuses] = useState<Map<string, CeremonyStatus>>(new Map());
     const [interactionStarted, setInteractionStarted] = useState(false);
     const [submitStatus, setSubmitStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     
@@ -81,27 +99,31 @@ export const PrayerAbsenceView: React.FC<PrayerAbsenceViewProps> = ({ onStudentS
       if (selectedDormitoryId) setInteractionStarted(true);
     }, [selectedDormitoryId]);
 
-    const toggleAbsent = (studentId: string) => {
-        setMarkedAsAbsent(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(studentId)) newSet.delete(studentId);
-            else newSet.add(studentId);
-            return newSet;
+    const toggleStatus = (studentId: string, status: CeremonyStatus) => {
+        setStudentStatuses(prev => {
+            const newMap = new Map(prev);
+            if (newMap.get(studentId) === status) {
+                newMap.delete(studentId);
+            } else {
+                newMap.set(studentId, status);
+            }
+            return newMap;
         });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitStatus(null);
-        if (markedAsAbsent.size === 0) {
-            setSubmitStatus({ type: 'error', text: 'لم يتم تحديد أي طالب كغائب.' });
+        if (studentStatuses.size === 0) {
+            setSubmitStatus({ type: 'error', text: 'لم يتم تحديد غياب أي طالب.' });
             return;
         }
         
-        const absenceData = Array.from(markedAsAbsent).map(studentId => ({
+        const absenceData = Array.from(studentStatuses.entries()).map(([studentId, status]) => ({
             student_id: studentId,
             date,
             prayer: selectedPrayer,
+            status,
         }));
 
         const { error } = await supabase.from('dormitory_prayer_absences').insert(absenceData);
@@ -110,7 +132,7 @@ export const PrayerAbsenceView: React.FC<PrayerAbsenceViewProps> = ({ onStudentS
         } else {
             setSubmitStatus({ type: 'success', text: `تم حفظ غياب ${absenceData.length} طالب بنجاح.` });
             refetchData();
-            setMarkedAsAbsent(new Set());
+            setStudentStatuses(new Map());
             setSelectedDormitoryId('');
             setInteractionStarted(false);
         }
@@ -153,13 +175,21 @@ export const PrayerAbsenceView: React.FC<PrayerAbsenceViewProps> = ({ onStudentS
                                 <div className="overflow-x-auto bg-white rounded-lg border">
                                     <table className="w-full text-sm text-right text-slate-600">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                                            <tr><th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th><th className="px-6 py-3 text-left whitespace-nowrap">تسجيل غياب</th></tr>
+                                            <tr><th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th><th className="px-6 py-3 text-left whitespace-nowrap">حالة الحضور</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
                                             {filteredStudents.map(student => (
                                                 <tr key={student.id} className="hover:bg-slate-50">
                                                     <td className="px-6 py-4 font-semibold text-slate-800 whitespace-nowrap">{student.name}</td>
-                                                    <td className="px-6 py-4 text-left whitespace-nowrap"><button type="button" onClick={() => toggleAbsent(student.id)} className={`px-4 py-1.5 text-sm font-bold rounded-full transition-colors duration-200 ${markedAsAbsent.has(student.id) ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-red-200'}`}>غائب</button></td>
+                                                    <td className="px-6 py-4 text-left whitespace-nowrap">
+                                                        <div className="flex justify-end gap-2">
+                                                            {Object.values(CeremonyStatus).map(status => {
+                                                                const isActive = studentStatuses.get(student.id) === status;
+                                                                const colors = statusColorMap[status];
+                                                                return <button key={status} type="button" onClick={() => toggleStatus(student.id, status)} className={`px-3 py-1 text-sm font-bold rounded-full border-2 transition-colors duration-200 ${isActive ? `${colors.bg} ${colors.text} ${colors.border}` : 'bg-slate-200 text-slate-600 border-transparent hover:bg-slate-300'}`}>{ceremonyStatusToLabel[status]}</button>
+                                                            })}
+                                                        </div>
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>

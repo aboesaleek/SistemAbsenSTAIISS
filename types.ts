@@ -1,3 +1,4 @@
+
 export enum AppMode {
   ACADEMIC = 'academic',
   DORMITORY = 'dormitory',
@@ -162,7 +163,7 @@ export enum CeremonyStatus {
 }
 
 export const ceremonyStatusToLabel: { [key in CeremonyStatus]: string } = {
-  [CeremonyStatus.ALPHA]: 'ألفا',
+  [CeremonyStatus.ALPHA]: 'غائب',
   [CeremonyStatus.IZIN]: 'إذن',
   [CeremonyStatus.SAKIT]: 'مرض',
 };
@@ -175,6 +176,7 @@ export interface DormitoryPrayerAbsence {
   dormitoryName: string;
   date: string;
   prayer: Prayer;
+  status: CeremonyStatus;
 }
 
 export interface DormitoryCeremonyAbsence {

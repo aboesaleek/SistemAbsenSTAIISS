@@ -61,6 +61,7 @@ export const DormitoryDataProvider: React.FC<{ children: React.ReactNode }> = ({
           studentId: p.student_id,
           date: p.date,
           prayer: p.prayer as Prayer,
+          status: p.status as CeremonyStatus,
           studentName: student?.name || 'N/A',
           dormitoryId: student?.dormitory_id || '',
           dormitoryName: student?.dormitory_id ? dormsMap.get(student.dormitory_id) || 'N/A' : 'N/A',
