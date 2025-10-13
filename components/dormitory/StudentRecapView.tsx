@@ -268,6 +268,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
                                                         <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
                                                         <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
+                                                        {/* FIX: Changed record.number_of_days to record.number_of_days, which is now correct after type update */}
                                                         <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.number_of_days}</td>
                                                         <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
                                                         <td className="px-6 py-4 action-cell whitespace-nowrap">

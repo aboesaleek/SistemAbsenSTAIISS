@@ -13,58 +13,64 @@ function App() {
   useEffect(() => {
     // This listener handles session restoration on page load and all auth events.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        // A user is logged in. Determine which dashboard to show.
-        // We prioritize the mode the user explicitly logged into, which is stored in sessionStorage.
-        const lastMode = sessionStorage.getItem('appMode') as AppMode;
+      try {
+        if (session?.user) {
+          // A user is logged in. Determine which dashboard to show.
+          // We prioritize the mode the user explicitly logged into, which is stored in sessionStorage.
+          const lastMode = sessionStorage.getItem('appMode') as AppMode;
 
-        // Fetch the user's role for validation and fallback.
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
+          // Fetch the user's role for validation and fallback.
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
 
-        if (error || !profile) {
-          console.error("Could not fetch user profile, signing out.", error);
-          await supabase.auth.signOut();
-          setLoggedInRole(null);
+          if (error || !profile) {
+            console.error("Could not fetch user profile, signing out.", error);
+            await supabase.auth.signOut();
+            setLoggedInRole(null);
+          } else {
+              const userRole = profile.role as AppRole;
+              let finalMode: AppMode | null = null;
+              
+              // Validate if the last used mode is accessible by the user's role.
+              let isLastModeValid = false;
+              if (lastMode) {
+                   if (userRole === AppRole.SUPER_ADMIN) isLastModeValid = true;
+                   else if (userRole === AppRole.ACADEMIC_ADMIN && lastMode === AppMode.ACADEMIC) isLastModeValid = true;
+                   else if (userRole === AppRole.DORMITORY_ADMIN && lastMode === AppMode.DORMITORY) isLastModeValid = true;
+              }
+
+              if (isLastModeValid) {
+                  finalMode = lastMode;
+              } else {
+                  // If no valid last mode, determine a default dashboard from their role.
+                  switch (userRole) {
+                      case AppRole.SUPER_ADMIN: finalMode = AppMode.ADMIN; break;
+                      case AppRole.ACADEMIC_ADMIN: finalMode = AppMode.ACADEMIC; break;
+                      case AppRole.DORMITORY_ADMIN: finalMode = AppMode.DORMITORY; break;
+                  }
+                  if (finalMode) {
+                      sessionStorage.setItem('appMode', finalMode);
+                  }
+              }
+              setLoggedInRole(finalMode);
+          }
+
         } else {
-            const userRole = profile.role as AppRole;
-            let finalMode: AppMode | null = null;
-            
-            // Validate if the last used mode is accessible by the user's role.
-            let isLastModeValid = false;
-            if (lastMode) {
-                 if (userRole === AppRole.SUPER_ADMIN) isLastModeValid = true;
-                 else if (userRole === AppRole.ACADEMIC_ADMIN && lastMode === AppMode.ACADEMIC) isLastModeValid = true;
-                 else if (userRole === AppRole.DORMITORY_ADMIN && lastMode === AppMode.DORMITORY) isLastModeValid = true;
-                 // FIX: The following line was removed as it was redundant and caused a TypeScript error.
-                 // The first `if` condition correctly handles all cases for a SUPER_ADMIN.
-            }
-
-            if (isLastModeValid) {
-                finalMode = lastMode;
-            } else {
-                // If no valid last mode, determine a default dashboard from their role.
-                switch (userRole) {
-                    case AppRole.SUPER_ADMIN: finalMode = AppMode.ADMIN; break;
-                    case AppRole.ACADEMIC_ADMIN: finalMode = AppMode.ACADEMIC; break;
-                    case AppRole.DORMITORY_ADMIN: finalMode = AppMode.DORMITORY; break;
-                }
-                if (finalMode) {
-                    sessionStorage.setItem('appMode', finalMode);
-                }
-            }
-            setLoggedInRole(finalMode);
+          // The user is not logged in.
+          setLoggedInRole(null);
+          sessionStorage.removeItem('appMode');
         }
-
-      } else {
-        // The user is not logged in.
+      } catch (e) {
+        console.error("An unexpected error occurred during auth state change handling:", e);
+        // Fallback to logged out state on any unexpected error
         setLoggedInRole(null);
         sessionStorage.removeItem('appMode');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     // Cleanup the subscription when the component unmounts.

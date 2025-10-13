@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { CeremonyStatus, ceremonyStatusToLabel } from '../../types';
+// FIX: Import specific absence types for type assertions.
+import { CeremonyStatus, ceremonyStatusToLabel, DormitoryPrayerAbsence, DormitoryCeremonyAbsence } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
@@ -87,7 +88,8 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
                                 </td>
                                 <td data-label="المهجع" className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
                                 <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
-                                <td data-label={headers[4]} className="px-6 py-4 whitespace-nowrap">{type === 'prayer' ? record.prayer : ceremonyStatusToLabel[record.status as CeremonyStatus]}</td>
+                                {/* FIX: Use type assertion to access properties on the union type correctly. */}
+                                <td data-label={headers[4]} className="px-6 py-4 whitespace-nowrap">{type === 'prayer' ? (record as DormitoryPrayerAbsence).prayer : ceremonyStatusToLabel[(record as DormitoryCeremonyAbsence).status]}</td>
                                 <td className="px-6 py-4 action-cell whitespace-nowrap">
                                     <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                 </td>

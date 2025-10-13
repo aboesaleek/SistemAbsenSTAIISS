@@ -75,10 +75,12 @@ export enum DormitoryPermissionType {
 
 export interface DormitoryPermission {
   id: string;
-  studentId: string;
+  // FIX: Changed studentId to student_id to match database schema.
+  student_id: string;
   date: string;
   type: DormitoryPermissionType;
-  numberOfDays: number;
+  // FIX: Changed numberOfDays to number_of_days to match database schema.
+  number_of_days: number;
   reason?: string;
 }
 
