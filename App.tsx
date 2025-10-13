@@ -11,70 +11,93 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // This listener handles session restoration on page load and all auth events.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        if (session?.user) {
-          // A user is logged in. Determine which dashboard to show.
-          // We prioritize the mode the user explicitly logged into, which is stored in sessionStorage.
-          const lastMode = sessionStorage.getItem('appMode') as AppMode;
+    let isMounted = true; // Handle component unmounting during async operations
 
-          // Fetch the user's role for validation and fallback.
-          const { data: profile, error } = await supabase
+    const checkUserSession = async () => {
+      try {
+        // First, get the current session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+
+        if (session?.user && isMounted) {
+          // If there's a session, fetch the user's profile to get their role
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', session.user.id)
             .single();
 
-          if (error || !profile) {
-            console.error("Could not fetch user profile, signing out.", error);
-            await supabase.auth.signOut();
-            setLoggedInRole(null);
-          } else {
-              const userRole = profile.role as AppRole;
-              let finalMode: AppMode | null = null;
-              
-              // Validate if the last used mode is accessible by the user's role.
-              let isLastModeValid = false;
-              if (lastMode) {
-                   if (userRole === AppRole.SUPER_ADMIN) isLastModeValid = true;
-                   else if (userRole === AppRole.ACADEMIC_ADMIN && lastMode === AppMode.ACADEMIC) isLastModeValid = true;
-                   else if (userRole === AppRole.DORMITORY_ADMIN && lastMode === AppMode.DORMITORY) isLastModeValid = true;
-              }
-
-              if (isLastModeValid) {
-                  finalMode = lastMode;
-              } else {
-                  // If no valid last mode, determine a default dashboard from their role.
-                  switch (userRole) {
-                      case AppRole.SUPER_ADMIN: finalMode = AppMode.ADMIN; break;
-                      case AppRole.ACADEMIC_ADMIN: finalMode = AppMode.ACADEMIC; break;
-                      case AppRole.DORMITORY_ADMIN: finalMode = AppMode.DORMITORY; break;
-                  }
-                  if (finalMode) {
-                      sessionStorage.setItem('appMode', finalMode);
-                  }
-              }
-              setLoggedInRole(finalMode);
+          if (profileError) {
+              console.error("Gagal mengambil profil (kemungkinan masalah RLS):", profileError.message);
+              throw profileError;
           }
 
+          if (!profile) {
+            // This case is rare but means profile doesn't exist for a logged-in user.
+            // Treat it as an error and sign out.
+            throw new Error("Profil pengguna tidak ditemukan. Keluar.");
+          }
+
+          if (isMounted) {
+            // Profile fetched successfully, determine the correct dashboard mode
+            const lastMode = sessionStorage.getItem('appMode') as AppMode;
+            const userRole = profile.role as AppRole;
+            let finalMode: AppMode | null = null;
+            
+            // Validate lastMode against user's actual role
+            let isLastModeValid = false;
+            if (lastMode) {
+                 if (userRole === AppRole.SUPER_ADMIN) isLastModeValid = true;
+                 else if (userRole === AppRole.ACADEMIC_ADMIN && lastMode === AppMode.ACADEMIC) isLastModeValid = true;
+                 else if (userRole === AppRole.DORMITORY_ADMIN && lastMode === AppMode.DORMITORY) isLastModeValid = true;
+            }
+
+            if (isLastModeValid) {
+                finalMode = lastMode;
+            } else {
+                // Fallback to a default mode based on role
+                switch (userRole) {
+                    case AppRole.SUPER_ADMIN: finalMode = AppMode.ADMIN; break;
+                    case AppRole.ACADEMIC_ADMIN: finalMode = AppMode.ACADEMIC; break;
+                    case AppRole.DORMITORY_ADMIN: finalMode = AppMode.DORMITORY; break;
+                }
+                if (finalMode) sessionStorage.setItem('appMode', finalMode);
+            }
+            setLoggedInRole(finalMode);
+          }
         } else {
-          // The user is not logged in.
+          // No session, user is logged out
           setLoggedInRole(null);
           sessionStorage.removeItem('appMode');
         }
-      } catch (e) {
-        console.error("An unexpected error occurred during auth state change handling:", e);
-        // Fallback to logged out state on any unexpected error
+      } catch (error: any) {
+        console.error("Terjadi kesalahan saat pemeriksaan sesi:", error.message);
+        // On any error (session check, profile fetch), sign out and show login page
+        await supabase.auth.signOut();
+        if (isMounted) {
+          setLoggedInRole(null);
+          sessionStorage.removeItem('appMode');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    checkUserSession();
+
+    // Listen for auth changes (specifically logout) that happen after the initial load
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // If the session is gone, it means the user logged out.
+      if (!session && isMounted) {
         setLoggedInRole(null);
         sessionStorage.removeItem('appMode');
-      } finally {
-        setLoading(false);
       }
     });
 
-    // Cleanup the subscription when the component unmounts.
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
