@@ -3,6 +3,8 @@ import { DormitoryViewType } from '../../pages/DormitoryDashboard';
 import { DocumentReportIcon } from '../icons/DocumentReportIcon';
 import { UserCircleIcon } from '../icons/UserCircleIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
+import { ClipboardListIcon } from '../icons/ClipboardListIcon';
+import { ClipboardCheckIcon } from '../icons/ClipboardCheckIcon';
 
 interface DormitoryHomeViewProps {
   navigateTo: (view: DormitoryViewType) => void;
@@ -59,7 +61,7 @@ export const DormitoryHomeView: React.FC<DormitoryHomeViewProps> = ({ navigateTo
       <div>
         <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4 text-center">الوحدات الرئيسية</h2>
         <p className="text-lg md:text-xl text-slate-600 mb-8 text-center">
-          ابدأ بتسجيل أذونات الطلاب للخروج أو العودة.
+          ابدأ بتسجيل أذونات الطلاب أو غياباتهم اليومية.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
              <MainModuleCard
@@ -69,18 +71,30 @@ export const DormitoryHomeView: React.FC<DormitoryHomeViewProps> = ({ navigateTo
                 onClick={() => navigateTo('permissions')}
                 gradient="from-purple-500 to-indigo-600"
             />
+            <MainModuleCard
+                icon={<ClipboardListIcon className="w-10 h-10" />}
+                title="تسجيل الغياب"
+                description="تسجيل غياب الطلاب عن الصلوات والمراسم اليومية."
+                onClick={() => navigateTo('absence')}
+                gradient="from-emerald-500 to-teal-600"
+            />
         </div>
       </div>
       
       <div>
         <h2 className="text-3xl font-bold text-slate-800 mb-4 text-center">التقارير والملخصات</h2>
         <p className="text-lg text-slate-500 mb-8 text-center">
-            استعرض وحلل بيانات الأذونات من خلال التقارير الشاملة التالية.
+            استعرض وحلل بيانات الأذونات والغيابات من خلال التقارير الشاملة التالية.
         </p>
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <ReportCard 
+                icon={<ClipboardCheckIcon className="w-6 h-6" />}
+                title="ملخص الغياب"
+                onClick={() => navigateTo('absenceRecap')}
+            />
             <ReportCard 
                 icon={<DocumentReportIcon className="w-6 h-6" />}
-                title="الخلاصة العامة"
+                title="ملخص الأذونات"
                 onClick={() => navigateTo('generalRecap')}
             />
             <ReportCard 

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-// FIX: Import Course type to correctly type data from Supabase.
-import { Class, Student, AttendanceRecord, RecapStatus, Course } from '../../types';
-import { supabase } from '../../supabaseClient';
+import { AttendanceRecord, RecapStatus } from '../../types';
+import { useAcademicData } from '../../contexts/AcademicDataContext';
 
 const StatCard: React.FC<{ label: string; value: number; gradient: string }> = ({ label, value, gradient }) => (
     <div className={`text-white p-4 rounded-xl shadow-lg bg-gradient-to-br ${gradient}`}>
@@ -74,71 +73,12 @@ interface StudentRecapViewProps {
 }
 
 export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedStudentId }) => {
+    const { classes, students, records: allRecords, loading } = useAcademicData();
+    
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState(preselectedStudentId || '');
     
-    const [classes, setClasses] = useState<Class[]>([]);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [allRecords, setAllRecords] = useState<AttendanceRecord[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
-            try {
-                const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
-                if (classesError) throw classesError;
-                setClasses(classesData || []);
-
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
-                if (studentsError) throw studentsError;
-                setStudents(studentsData || []);
-                
-                const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
-                if (coursesError) throw coursesError;
-                // FIX: Explicitly type map to provide type safety for Supabase data.
-                const coursesMap = new Map<string, string>((coursesData as Course[] || []).map(c => [c.id, c.name]));
-
-                const { data: permissionsData, error: permissionsError } = await supabase.from('academic_permissions').select('*');
-                if (permissionsError) throw permissionsError;
-
-                const { data: absencesData, error: absencesError } = await supabase.from('academic_absences').select('*');
-                if (absencesError) throw absencesError;
-                
-                const combined: AttendanceRecord[] = [];
-
-                (permissionsData || []).forEach((p: any) => {
-                    combined.push({
-                        id: `p-${p.id}`,
-                        studentId: p.student_id,
-                        studentName: '', className: '', classId: '',
-                        date: p.date,
-                        status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
-                    });
-                });
-
-                (absencesData || []).forEach((a: any) => {
-                    combined.push({
-                        id: `a-${a.id}`,
-                        studentId: a.student_id,
-                        studentName: '', className: '', classId: '',
-                        date: a.date,
-                        status: RecapStatus.ABSENT,
-                        courseName: coursesMap.get(a.course_id) || 'غير معروف',
-                    });
-                });
-                
-                setAllRecords(combined);
-            } catch (error: any) {
-                console.error(`فشل في جلب البيانات: ${error.message}`);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchData();
-    }, []);
-
     useEffect(() => {
       if (preselectedStudentId && students.length > 0) {
         const student = students.find(s => s.id === preselectedStudentId);
@@ -167,11 +107,10 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                 absenceDetailsByCourse.set(courseName, []);
             }
             const dates = absenceDetailsByCourse.get(courseName)!;
-            if (dates.length < 3) { // Hanya simpan hingga 3 tanggal
+            if (dates.length < 3) {
                 dates.push(record.date);
             }
         });
-        // Urutkan tanggal untuk setiap mata kuliah
         absenceDetailsByCourse.forEach(dates => dates.sort());
 
         return {

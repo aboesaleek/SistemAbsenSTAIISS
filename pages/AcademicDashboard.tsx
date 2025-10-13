@@ -14,6 +14,7 @@ import { StudentRecapView } from '../components/academic/StudentRecapView';
 import { UserCircleIcon } from '../components/icons/UserCircleIcon';
 import { FollowUpView } from '../components/academic/FollowUpView';
 import { CallingIcon } from '../components/icons/CallingIcon';
+import { AcademicDataProvider } from '../contexts/AcademicDataContext';
 
 export type AcademicViewType = 'home' | 'permissions' | 'attendance' | 'followUp' | 'recap' | 'classRecap' | 'studentRecap';
 
@@ -21,7 +22,7 @@ interface AcademicDashboardProps {
   onLogout: () => void;
 }
 
-export const AcademicDashboard: React.FC<AcademicDashboardProps> = ({ onLogout }) => {
+const AcademicDashboardContent: React.FC<AcademicDashboardProps> = ({ onLogout }) => {
   const [currentView, setCurrentView] = useState<AcademicViewType>('home');
   const [selectedStudentIdForRecap, setSelectedStudentIdForRecap] = useState<string | null>(null);
 
@@ -113,3 +114,9 @@ export const AcademicDashboard: React.FC<AcademicDashboardProps> = ({ onLogout }
     </DashboardLayout>
   );
 };
+
+export const AcademicDashboard: React.FC<AcademicDashboardProps> = (props) => (
+  <AcademicDataProvider>
+    <AcademicDashboardContent {...props} />
+  </AcademicDataProvider>
+);

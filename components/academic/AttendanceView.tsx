@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Class, Student, Course, AttendanceRecord, RecapStatus } from '../../types';
+import { Student, AttendanceRecord, RecapStatus } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
+import { useAcademicData } from '../../contexts/AcademicDataContext';
 
 const statusColorMap: { [key in RecapStatus]: string } = {
   [RecapStatus.ABSENT]: 'bg-red-100 text-red-800',
@@ -66,6 +67,8 @@ interface AttendanceViewProps {
 }
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect }) => {
+    const { classes, students, courses, records, loading, refetchData } = useAcademicData();
+
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
@@ -74,90 +77,12 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect 
     const [interactionStarted, setInteractionStarted] = useState(false);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [submitStatus, setSubmitStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-    const [todayRecords, setTodayRecords] = useState<AttendanceRecord[]>([]);
     
-    const [classes, setClasses] = useState<Class[]>([]);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [courses, setCourses] = useState<Course[]>([]);
-    const [loading, setLoading] = useState(true);
+    const todayRecords = useMemo(() => {
+        const today = new Date().toISOString().split('T')[0];
+        return records.filter(r => r.date === today);
+    }, [records]);
 
-    async function fetchData() {
-        setLoading(true);
-        try {
-            const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
-            if (classesError) throw classesError;
-            setClasses(classesData || []);
-
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
-            if (studentsError) throw studentsError;
-            setStudents(studentsData || []);
-            
-            const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
-            if (coursesError) throw coursesError;
-            setCourses(coursesData || []);
-
-            // Fetch today's detailed records
-            const today = new Date().toISOString().split('T')[0];
-
-            const { data: permissionsToday, error: permissionsError } = await supabase
-                .from('academic_permissions').select('*').eq('date', today);
-            if (permissionsError) throw permissionsError;
-
-            const { data: absencesToday, error: absencesError } = await supabase
-                .from('academic_absences').select('*').eq('date', today);
-            if (absencesError) throw absencesError;
-            
-            // FIX: Explicitly type Maps to prevent type errors when accessing properties.
-            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
-            const classesMap = new Map<string, Class>((classesData || []).map(c => [c.id, c]));
-            const coursesMap = new Map<string, Course>((coursesData || []).map(c => [c.id, c]));
-
-            const combined: AttendanceRecord[] = [];
-
-            (permissionsToday || []).forEach((p: any) => {
-                const student = studentsMap.get(p.student_id);
-                if (!student) return;
-                const studentClass = classesMap.get(student.class_id);
-                combined.push({
-                    id: `p-${p.id}`,
-                    studentId: p.student_id,
-                    studentName: student.name,
-                    classId: student.class_id || '',
-                    className: studentClass?.name || 'N/A',
-                    date: p.date,
-                    status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
-                });
-            });
-
-            (absencesToday || []).forEach((a: any) => {
-                const student = studentsMap.get(a.student_id);
-                if (!student) return;
-                const studentClass = classesMap.get(student.class_id);
-                const course = coursesMap.get(a.course_id);
-                combined.push({
-                    id: `a-${a.id}`,
-                    studentId: a.student_id,
-                    studentName: student.name,
-                    classId: student.class_id || '',
-                    className: studentClass?.name || 'N/A',
-                    date: a.date,
-                    status: RecapStatus.ABSENT,
-                    courseName: course?.name,
-                });
-            });
-
-            setTodayRecords(combined.sort((a, b) => a.studentName.localeCompare(b.studentName)));
-
-        } catch (error: any) {
-            console.error(`فشل في جلب البيانات: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     const filteredStudents = useMemo(() => {
         if (!selectedClassId) return [];
@@ -221,8 +146,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect 
             setSubmitStatus({ type: 'error', text: `فشل تسجيل الغياب: ${error.message}` });
         } else {
             setSubmitStatus({ type: 'success', text: `تم تسجيل غياب ${absenceData.length} طالب بنجاح.` });
-            // Refresh today's data and reset form
-            fetchData();
+            refetchData();
             setMarkedAsAbsent(new Set());
             setSelectedClassId('');
             setSelectedCourseId('');
@@ -245,7 +169,6 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect 
                 </div>
             )}
 
-            {/* Search and Filter Controls */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div className="relative">
                     <label htmlFor="student-search" className="block text-sm font-semibold text-slate-700 mb-2">بحث عن طالب</label>

@@ -143,3 +143,44 @@ export interface DormitoryStudentRecapData {
   total: number;
   uniqueDays: number;
 }
+
+// Tipe baru untuk Absensi Asrama
+export enum Prayer {
+  SUBUH = 'الصبح',
+  DHUHUR = 'الظهر',
+  ASAR = 'العصر',
+  MAGHRIB = 'المغرب',
+  ISYA = 'العشاء',
+}
+
+export enum CeremonyStatus {
+  ALPHA = 'alpha',
+  IZIN = 'izin',
+  SAKIT = 'sakit',
+}
+
+export const ceremonyStatusToLabel: { [key in CeremonyStatus]: string } = {
+  [CeremonyStatus.ALPHA]: 'ألفا',
+  [CeremonyStatus.IZIN]: 'إذن',
+  [CeremonyStatus.SAKIT]: 'مرض',
+};
+
+export interface DormitoryPrayerAbsence {
+  id: string;
+  studentId: string;
+  studentName: string;
+  dormitoryId: string;
+  dormitoryName: string;
+  date: string;
+  prayer: Prayer;
+}
+
+export interface DormitoryCeremonyAbsence {
+  id: string;
+  studentId: string;
+  studentName: string;
+  dormitoryId: string;
+  dormitoryName: string;
+  date: string;
+  status: CeremonyStatus;
+}

@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Dormitory, Student, DormitoryPermission, DormitoryPermissionType } from '../../types';
+import { Dormitory, Student, DormitoryPermission, DormitoryPermissionType, Prayer, CeremonyStatus, ceremonyStatusToLabel } from '../../types';
 import { supabase } from '../../supabaseClient';
+import { DeleteIcon } from '../icons/DeleteIcon';
+import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 
 const StatCard: React.FC<{ label: string; value: number; gradient: string }> = ({ label, value, gradient }) => (
     <div className={`text-white p-4 rounded-xl shadow-lg bg-gradient-to-br ${gradient}`}>
@@ -9,12 +11,12 @@ const StatCard: React.FC<{ label: string; value: number; gradient: string }> = (
     </div>
 );
 
-const DonutChart: React.FC<{ data: { label: string; value: number; color: string; bgColor: string }[] }> = ({ data }) => {
+const DonutChart: React.FC<{ title: string; data: { label: string; value: number; color: string; bgColor: string }[] }> = ({ title, data }) => {
     const total = data.reduce((acc, item) => acc + item.value, 0);
     if (total === 0) {
        return (
          <div className="w-full flex flex-col items-center justify-center bg-slate-50/80 p-6 rounded-xl border border-slate-200/60 min-h-[316px]">
-            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">ملخص الأذونات</h4>
+            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">{title}</h4>
             <p className="text-slate-500">لا توجد بيانات لعرضها.</p>
         </div>
        )
@@ -25,7 +27,7 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
 
     return (
         <div className="w-full flex flex-col items-center justify-center bg-slate-50/80 p-6 rounded-xl border border-slate-200/60 min-h-[316px]">
-            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">ملخص الأذونات</h4>
+            <h4 className="text-lg font-bold text-slate-700 mb-4 text-center">{title}</h4>
             <div className="relative w-40 h-40">
                 <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
                     <circle cx="18" cy="18" r={radius} className="stroke-current text-slate-200" strokeWidth="3" fill="transparent" />
@@ -68,53 +70,42 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
     );
 };
 
+const MainTabButton: React.FC<{ isActive: boolean; onClick: () => void; children: React.ReactNode; }> = ({ isActive, onClick, children }) => (
+    <button onClick={onClick} className={`px-6 py-3 text-lg font-bold transition-colors duration-200 focus:outline-none ${isActive ? 'border-b-4 border-purple-600 text-purple-700' : 'text-slate-500 hover:text-slate-800'}`}>
+        {children}
+    </button>
+);
+
 interface StudentRecapViewProps {
   preselectedStudentId?: string | null;
 }
 
 export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedStudentId }) => {
+    const { dormitories, students, permissionRecords, prayerAbsences, ceremonyAbsences, loading, refetchData } = useDormitoryData();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState(preselectedStudentId || '');
-    
-    const [dormitories, setDormitories] = useState<Dormitory[]>([]);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [allRecords, setAllRecords] = useState<DormitoryPermission[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'permissions' | 'absences'>('permissions');
 
-    useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
-            try {
-                const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
-                if (dormsError) throw dormsError;
-                setDormitories(dormsData || []);
-
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitory_id', 'is', null);
-                if (studentsError) throw studentsError;
-                setStudents(studentsData || []);
-                
-                const { data: permissionsData, error: permissionsError } = await supabase.from('dormitory_permissions').select('*');
-                if (permissionsError) throw permissionsError;
-
-                const mappedRecords = (permissionsData || []).map((p: any): DormitoryPermission => ({
-                    id: p.id,
-                    studentId: p.student_id, // Map snake_case to camelCase
-                    date: p.date,
-                    type: p.type as DormitoryPermissionType,
-                    numberOfDays: p.number_of_days, // Map snake_case to camelCase
-                    reason: p.reason
-                }));
-                setAllRecords(mappedRecords);
-
-            } catch (error: any) {
-                console.error(`فشل في جلب البيانات: ${error.message}`);
-            } finally {
-                setLoading(false);
-            }
+    const deleteAbsenceRecord = async (id: string, type: 'prayer' | 'ceremony') => {
+        const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
+        const { error } = await supabase.from(tableName).delete().eq('id', id);
+        if (error) {
+            console.error(`Gagal menghapus catatan: ${error.message}`);
+        } else {
+            refetchData();
         }
-        fetchData();
-    }, []);
+    };
+    
+    const deletePermissionRecord = async (id: string) => {
+        const { error } = await supabase.from('dormitory_permissions').delete().eq('id', id);
+        if (error) {
+            console.error(`Gagal menghapus catatan: ${error.message}`);
+        } else {
+            refetchData();
+        }
+    }
 
     useEffect(() => {
       if (preselectedStudentId && students.length > 0) {
@@ -126,9 +117,9 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
       }
     }, [preselectedStudentId, students]);
 
-    const studentData = useMemo(() => {
+    const permissionData = useMemo(() => {
         if (!selectedStudentId) return null;
-        const records = allRecords.filter(r => r.studentId === selectedStudentId);
+        const records = permissionRecords.filter((r: any) => r.student_id === selectedStudentId);
         const sickRecords = records.filter(r => r.type === DormitoryPermissionType.SICK_LEAVE);
         const groupRecords = records.filter(r => r.type === DormitoryPermissionType.GROUP_LEAVE);
         const generalRecords = records.filter(r => r.type === DormitoryPermissionType.GENERAL_LEAVE);
@@ -142,7 +133,39 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             overnightCount: overnightRecords.length,
             total: records.length
         };
-    }, [selectedStudentId, allRecords]);
+    }, [selectedStudentId, permissionRecords]);
+    
+    const absenceData = useMemo(() => {
+        if (!selectedStudentId) return null;
+        
+        const prayerRecords = prayerAbsences.filter(r => r.studentId === selectedStudentId);
+        const ceremonyRecords = ceremonyAbsences.filter(r => r.studentId === selectedStudentId);
+
+        const combinedAbsenceRecords = [
+            ...prayerRecords.map(r => ({
+                id: r.id,
+                date: r.date,
+                type: 'غياب الصلاة',
+                details: r.prayer as Prayer,
+                sourceTable: 'prayer' as const
+            })),
+            ...ceremonyRecords.map(r => ({
+                id: r.id,
+                date: r.date,
+                type: 'غياب المراسم',
+                details: ceremonyStatusToLabel[r.status as CeremonyStatus],
+                sourceTable: 'ceremony' as const
+            }))
+        ].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return {
+            combinedAbsenceRecords,
+            totalPrayer: prayerRecords.length,
+            totalCeremony: ceremonyRecords.length,
+            totalAbsences: prayerRecords.length + ceremonyRecords.length,
+        };
+    }, [selectedStudentId, prayerAbsences, ceremonyAbsences]);
+
 
     const filteredStudents = useMemo(() => {
         let result = students;
@@ -194,65 +217,130 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                 </div>
             </div>
 
-            {studentData && (
-                <div className="space-y-6">
-                    <div className="p-4 sm:p-6 bg-white rounded-2xl shadow-lg border">
-                        <h3 className="text-2xl font-bold text-slate-800 mb-4">{students.find(s=>s.id === selectedStudentId)?.name}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="flex flex-col justify-between space-y-4">
-                               <div className="text-center p-6 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl shadow-xl">
-                                    <p className="text-lg font-semibold">مجموع الأذونات</p>
-                                    <p className="text-7xl font-extrabold tracking-tighter">{studentData.total}</p>
+            {selectedStudentId && (
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+                    <div className="flex justify-center border-b">
+                        <MainTabButton isActive={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')}>ملخص الأذونات</MainTabButton>
+                        <MainTabButton isActive={activeTab === 'absences'} onClick={() => setActiveTab('absences')}>ملخص الغياب</MainTabButton>
+                    </div>
+
+                    {activeTab === 'permissions' && permissionData && (
+                        <div className="p-4 sm:p-6 space-y-6">
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="flex flex-col justify-between space-y-4">
+                                   <div className="text-center p-6 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl shadow-xl">
+                                        <p className="text-lg font-semibold">مجموع الأذونات</p>
+                                        <p className="text-7xl font-extrabold tracking-tighter">{permissionData.total}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                        <StatCard label="مرض" value={permissionData.sickCount} gradient="from-red-500 to-orange-500" />
+                                        <StatCard label="جماعي" value={permissionData.groupCount} gradient="from-sky-500 to-indigo-600" />
+                                        <StatCard label="فردي" value={permissionData.generalCount} gradient="from-emerald-500 to-teal-600" />
+                                        <StatCard label="مبيت" value={permissionData.overnightCount} gradient="from-slate-700 to-gray-800" />
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                    <StatCard label="مرض" value={studentData.sickCount} gradient="from-red-500 to-orange-500" />
-                                    <StatCard label="جماعي" value={studentData.groupCount} gradient="from-sky-500 to-indigo-600" />
-                                    <StatCard label="فردي" value={studentData.generalCount} gradient="from-emerald-500 to-teal-600" />
-                                    <StatCard label="مبيت" value={studentData.overnightCount} gradient="from-slate-700 to-gray-800" />
+                                <DonutChart title="ملخص الأذونات" data={[
+                                    {label: 'مرض', value: permissionData.sickCount, color: 'text-red-500', bgColor: 'bg-red-500'},
+                                    {label: 'جماعي', value: permissionData.groupCount, color: 'text-sky-500', bgColor: 'bg-sky-500'},
+                                    {label: 'فردي', value: permissionData.generalCount, color: 'text-emerald-500', bgColor: 'bg-emerald-500'},
+                                    {label: 'مبيت', value: permissionData.overnightCount, color: 'text-slate-700', bgColor: 'bg-slate-700'},
+                                ]} />
+                            </div>
+                        
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل الإذن</h3>
+                                <div className="overflow-x-auto max-h-96 border rounded-lg">
+                                    <table className="w-full text-sm text-right text-slate-600 responsive-table">
+                                        <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
+                                            <tr>
+                                                <th className="px-6 py-3 whitespace-nowrap">#</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">النوع</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">عدد الأيام</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">البيان</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white">
+                                            {permissionData.records.length > 0 ? (
+                                                permissionData.records.map((record, index) => (
+                                                    <tr key={record.id} className="border-b hover:bg-slate-50">
+                                                        <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
+                                                        <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
+                                                        <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
+                                                        <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.number_of_days}</td>
+                                                        <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
+                                                        <td className="px-6 py-4 action-cell whitespace-nowrap">
+                                                            <button onClick={() => deletePermissionRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={6} className="text-center py-8 text-slate-500">لا يوجد سجل إذن لهذا الطالب.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-                            <DonutChart data={[
-                                {label: 'مرض', value: studentData.sickCount, color: 'text-red-500', bgColor: 'bg-red-500'},
-                                {label: 'جماعي', value: studentData.groupCount, color: 'text-sky-500', bgColor: 'bg-sky-500'},
-                                {label: 'فردي', value: studentData.generalCount, color: 'text-emerald-500', bgColor: 'bg-emerald-500'},
-                                {label: 'مبيت', value: studentData.overnightCount, color: 'text-slate-700', bgColor: 'bg-slate-700'},
-                            ]} />
                         </div>
-                    </div>
-                
-                    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border">
-                        <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل الإذن</h3>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-right text-slate-600 responsive-table">
-                                <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                                    <tr>
-                                        <th className="px-6 py-3 whitespace-nowrap">#</th>
-                                        <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                                        <th className="px-6 py-3 whitespace-nowrap">النوع</th>
-                                        <th className="px-6 py-3 whitespace-nowrap">عدد الأيام</th>
-                                        <th className="px-6 py-3 whitespace-nowrap">البيان</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {studentData.records.length > 0 ? (
-                                        studentData.records.map((record, index) => (
-                                            <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                                <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
-                                                <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
-                                                <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
-                                                <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.numberOfDays}</td>
-                                                <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
+                    )}
+                    
+                    {activeTab === 'absences' && absenceData && (
+                        <div className="p-4 sm:p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="flex flex-col justify-between space-y-4">
+                                    <div className="text-center p-6 bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-xl shadow-xl">
+                                        <p className="text-lg font-semibold">مجموع الغيابات</p>
+                                        <p className="text-7xl font-extrabold tracking-tighter">{absenceData.totalAbsences}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <StatCard label="غياب الصلاة" value={absenceData.totalPrayer} gradient="from-sky-500 to-indigo-600" />
+                                        <StatCard label="غياب المراسم" value={absenceData.totalCeremony} gradient="from-rose-500 to-pink-600" />
+                                    </div>
+                                </div>
+                                <DonutChart title="ملخص الغياب" data={[
+                                    {label: 'غياب الصلاة', value: absenceData.totalPrayer, color: 'text-sky-500', bgColor: 'bg-sky-500'},
+                                    {label: 'غياب المراسم', value: absenceData.totalCeremony, color: 'text-rose-500', bgColor: 'bg-rose-500'},
+                                ]} />
+                            </div>
+                        
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل الغياب</h3>
+                                <div className="overflow-x-auto max-h-96 border rounded-lg">
+                                    <table className="w-full text-sm text-right text-slate-600 responsive-table">
+                                        <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
+                                            <tr>
+                                                <th className="px-6 py-3 whitespace-nowrap">#</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">النوع</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">التفاصيل</th>
+                                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
                                             </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={5} className="text-center py-8 text-slate-500">لا يوجد سجل إذن لهذا الطالب.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                        </thead>
+                                        <tbody className="bg-white">
+                                            {absenceData.combinedAbsenceRecords.length > 0 ? (
+                                                absenceData.combinedAbsenceRecords.map((record, index) => (
+                                                    <tr key={record.id} className="border-b hover:bg-slate-50">
+                                                        <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
+                                                        <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
+                                                        <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
+                                                        <td data-label="التفاصيل" className="px-6 py-4 whitespace-nowrap">{record.details}</td>
+                                                        <td className="px-6 py-4 action-cell whitespace-nowrap">
+                                                            <button onClick={() => deleteAbsenceRecord(record.id, record.sourceTable)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr><td colSpan={5} className="text-center py-8 text-slate-500">لا يوجد سجل غياب لهذا الطالب.</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             )}
         </div>

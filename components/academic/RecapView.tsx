@@ -1,11 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
-// FIX: Import Student and Course types to correctly type data from Supabase.
-import { AttendanceRecord, RecapStatus, Class, Student, Course } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { AttendanceRecord, RecapStatus } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { supabase } from '../../supabaseClient';
+import { useAcademicData } from '../../contexts/AcademicDataContext';
 
-// Local type for combined record
 interface CombinedRecord extends AttendanceRecord {
     sourceId: string;
     sourceType: 'permission' | 'absence';
@@ -22,90 +21,24 @@ interface RecapViewProps {
 }
 
 export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
-    const [records, setRecords] = useState<CombinedRecord[]>([]);
-    const [classes, setClasses] = useState<Class[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { classes, records: allRecords, loading, refetchData } = useAcademicData();
+    
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
-    async function fetchData() {
-        setLoading(true);
-        try {
-            const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
-            if (classesError) throw classesError;
-            setClasses(classesData || []);
-
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*');
-            if (studentsError) throw studentsError;
-            
-            const { data: coursesData, error: coursesError } = await supabase.from('courses').select('*');
-            if (coursesError) throw coursesError;
-
-            const { data: permissionsData, error: permissionsError } = await supabase.from('academic_permissions').select('*');
-            if (permissionsError) throw permissionsError;
-
-            const { data: absencesData, error: absencesError } = await supabase.from('academic_absences').select('*');
-            if (absencesError) throw absencesError;
-            
-            // FIX: Explicitly type maps to provide type safety for Supabase data.
-            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
-            const classesMap = new Map<string, Class>((classesData || []).map(c => [c.id, c]));
-            const coursesMap = new Map<string, Course>((coursesData || []).map(c => [c.id, c]));
-
-            const combined: CombinedRecord[] = [];
-
-            (permissionsData || []).forEach((p: any) => {
-                const student = studentsMap.get(p.student_id);
-                if (!student) return;
-                const studentClass = classesMap.get(student.class_id);
-                combined.push({
-                    id: `p-${p.id}`,
-                    sourceId: p.id,
-                    sourceType: 'permission',
-                    studentId: p.student_id,
-                    studentName: student.name,
-                    classId: student.class_id || '',
-                    className: studentClass?.name || 'N/A',
-                    date: p.date,
-                    status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
-                });
-            });
-
-            (absencesData || []).forEach((a: any) => {
-                const student = studentsMap.get(a.student_id);
-                if (!student) return;
-                const studentClass = classesMap.get(student.class_id);
-                const course = coursesMap.get(a.course_id);
-                combined.push({
-                    id: `a-${a.id}`,
-                    sourceId: a.id,
-                    sourceType: 'absence',
-                    studentId: a.student_id,
-                    studentName: student.name,
-                    classId: student.class_id || '',
-                    className: studentClass?.name || 'N/A',
-                    date: a.date,
-                    status: RecapStatus.ABSENT,
-                    courseName: course?.name,
-                });
-            });
-            
-            setRecords(combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        } catch (error: any) {
-             console.error(`فشل في جلب البيانات: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        fetchData();
-    }, []);
+    // Transform records from context to include sourceId and sourceType for deletion
+    const combinedRecords = useMemo((): CombinedRecord[] => {
+        return allRecords.map(r => ({
+            ...r,
+            sourceId: r.id.substring(2),
+            sourceType: r.id.startsWith('p-') ? 'permission' : 'absence'
+        }));
+    }, [allRecords]);
 
     const filteredRecords = useMemo(() => {
-        return records.filter(record => {
+        return combinedRecords.filter(record => {
             const matchesSearch = record.studentName.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesClass = !selectedClassId || record.classId === selectedClassId;
             const recordDate = new Date(record.date);
@@ -113,7 +46,7 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
             const matchesEndDate = !endDate || recordDate <= new Date(endDate);
             return matchesSearch && matchesClass && matchesStartDate && matchesEndDate;
         });
-    }, [records, searchQuery, selectedClassId, startDate, endDate]);
+    }, [combinedRecords, searchQuery, selectedClassId, startDate, endDate]);
 
     const deleteRecord = async (record: CombinedRecord) => {
         const tableName = record.sourceType === 'permission' ? 'academic_permissions' : 'academic_absences';
@@ -122,7 +55,7 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
         if (error) {
             console.error(`فشل الحذف: ${error.message}`);
         } else {
-            fetchData(); // Refresh data
+            refetchData(); // Refresh data terpusat
         }
     };
     

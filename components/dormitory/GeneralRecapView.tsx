@@ -3,6 +3,7 @@ import { Dormitory, Student, DormitoryPermissionType } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { supabase } from '../../supabaseClient';
+import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 
 interface RecapRecord {
     id: string;
@@ -22,34 +23,19 @@ interface GenericDormitoryRecapProps {
 }
 
 const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissionType, title, onStudentSelect }) => {
-    const [records, setRecords] = useState<RecapRecord[]>([]);
-    const [dormitories, setDormitories] = useState<Dormitory[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { dormitories, students, permissionRecords, loading, refetchData } = useDormitoryData();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
 
-    async function fetchData() {
-        setLoading(true);
-        try {
-            const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
-            if (dormsError) throw dormsError;
-            setDormitories(dormsData || []);
-            const dormsMap = new Map((dormsData || []).map(d => [d.id, d.name]));
+    const records = useMemo(() => {
+        const studentsMap = new Map<string, Student>(students.map(s => [s.id, s]));
+        const dormsMap = new Map<string, string>(dormitories.map(d => [d.id, d.name]));
 
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('id, name, dormitory_id');
-            if (studentsError) throw studentsError;
-            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
-
-            const { data: permissionsData, error: permissionsError } = await supabase
-                .from('dormitory_permissions')
-                .select('*')
-                .eq('type', permissionType);
-
-            if (permissionsError) throw permissionsError;
-
-            const fetchedRecords = (permissionsData || []).map((p: any) => {
+        return permissionRecords
+            .filter(p => p.type === permissionType)
+            .map((p: any) => {
                 const student = studentsMap.get(p.student_id);
-                const dormitoryName = student ? dormsMap.get(student.dormitory_id) : 'N/A';
+                const dormitoryName = student ? dormsMap.get(student.dormitory_id!) : 'N/A';
                 return {
                     id: p.id,
                     studentId: p.student_id,
@@ -61,18 +47,7 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
                     reason: p.reason
                 };
             }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            
-            setRecords(fetchedRecords);
-        } catch (error: any) {
-            console.error(`Failed to fetch data for ${title}: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        fetchData();
-    }, [permissionType]); // Refetch when the type changes
+    }, [permissionType, students, dormitories, permissionRecords]);
 
     const filteredRecords = useMemo(() => {
         return records.filter(record => {
@@ -85,9 +60,9 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
     const deleteRecord = async (id: string) => {
         const { error } = await supabase.from('dormitory_permissions').delete().eq('id', id);
         if (error) {
-            console.error(`Failed to delete record: ${error.message}`);
+            console.error(`Gagal menghapus catatan: ${error.message}`);
         } else {
-            fetchData();
+            refetchData();
         }
     };
 
@@ -186,9 +161,9 @@ export const GeneralRecapView: React.FC<GeneralRecapViewProps> = ({ onStudentSel
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-slate-800">الخلاصة العامة</h2>
+            <h2 className="text-3xl font-bold text-slate-800">ملخص الأذونات</h2>
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 no-print">
-                <label htmlFor="recap-select" className="block text-lg font-semibold text-slate-700 mb-2">اختر نوع الخلاصة</label>
+                <label htmlFor="recap-select" className="block text-lg font-semibold text-slate-700 mb-2">اختر نوع الملخص</label>
                 <select
                     id="recap-select"
                     value={activeRecap}

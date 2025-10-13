@@ -1,80 +1,16 @@
-import React, { useState, useMemo, useEffect } from 'react';
-// FIX: Import Student type to correctly type data from Supabase.
-import { AttendanceRecord, RecapStatus, Class, StudentRecapData, Student } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { RecapStatus, StudentRecapData } from '../../types';
 import { PrinterIcon } from '../icons/PrinterIcon';
-import { supabase } from '../../supabaseClient';
+import { useAcademicData } from '../../contexts/AcademicDataContext';
 
 interface ClassRecapViewProps {
   onStudentSelect: (studentId: string) => void;
 }
 
 export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect }) => {
+    const { classes, records: allRecords, loading } = useAcademicData();
     const [selectedClassId, setSelectedClassId] = useState('');
-    const [classes, setClasses] = useState<Class[]>([]);
-    const [allRecords, setAllRecords] = useState<AttendanceRecord[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    async function fetchData() {
-        setLoading(true);
-        try {
-            const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
-            if (classesError) throw classesError;
-            setClasses(classesData || []);
-
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*');
-            if (studentsError) throw studentsError;
-
-            const { data: permissionsData, error: permissionsError } = await supabase.from('academic_permissions').select('*');
-            if (permissionsError) throw permissionsError;
-
-            const { data: absencesData, error: absencesError } = await supabase.from('academic_absences').select('*');
-            if (absencesError) throw absencesError;
-            
-            // FIX: Explicitly type map to provide type safety for Supabase data.
-            const studentsMap = new Map<string, Student>((studentsData || []).map(s => [s.id, s]));
-            
-            const combined: AttendanceRecord[] = [];
-
-            (permissionsData || []).forEach((p: any) => {
-                const student = studentsMap.get(p.student_id);
-                if (!student) return;
-                combined.push({
-                    id: `p-${p.id}`,
-                    studentId: p.student_id,
-                    studentName: student.name,
-                    classId: student.class_id || '',
-                    className: '', // not needed for this calculation
-                    date: p.date,
-                    status: p.type === 'sakit' ? RecapStatus.SICK : RecapStatus.PERMISSION,
-                });
-            });
-
-            (absencesData || []).forEach((a: any) => {
-                const student = studentsMap.get(a.student_id);
-                if (!student) return;
-                combined.push({
-                    id: `a-${a.id}`,
-                    studentId: a.student_id,
-                    studentName: student.name,
-                    classId: student.class_id || '',
-                    className: '', // not needed for this calculation
-                    date: a.date,
-                    status: RecapStatus.ABSENT,
-                });
-            });
-            
-            setAllRecords(combined);
-        } catch (error: any) {
-             console.error(`فشل في جلب البيانات: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        fetchData();
-    }, []);
-
+    
     const classRecapData = useMemo((): StudentRecapData[] => {
         if (!selectedClassId) return [];
 
@@ -100,7 +36,6 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
             if (record.status === RecapStatus.SICK) studentData.sickCount++;
         }
 
-        // Calculate unique days
         studentDataMap.forEach(data => {
             const studentRecords = classRecords.filter(r => r.studentId === data.studentId);
             const uniqueDates = new Set(studentRecords.map(r => r.date));

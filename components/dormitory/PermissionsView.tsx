@@ -1,55 +1,26 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Dormitory, Student, DormitoryPermissionType } from '../../types';
+import { Student, DormitoryPermissionType } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
+import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 
 
 export const PermissionsView: React.FC = () => {
-    // Form State
+    const { dormitories, students, loading, refetchData } = useDormitoryData();
+
     const [permissionType, setPermissionType] = useState<DormitoryPermissionType>(DormitoryPermissionType.GENERAL_LEAVE);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [numberOfDays, setNumberOfDays] = useState(1);
     const [reason, setReason] = useState('');
     const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
     
-    // Student Selection State
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
 
-    // Data State
-    const [dormitories, setDormitories] = useState<Dormitory[]>([]);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    // Search and Filter State
     const [searchQuery, setSearchQuery] = useState('');
     const [groupSelectedDormId, setGroupSelectedDormId] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
-
-    const dormitoriesMap = useMemo(() => new Map(dormitories.map(d => [d.id, d.name])), [dormitories]);
-
-    async function fetchData() {
-        setLoading(true);
-        try {
-            const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
-            if (dormsError) throw dormsError;
-            setDormitories(dormsData || []);
-
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitory_id', 'is', null);
-            if (studentsError) throw studentsError;
-            setStudents(studentsData.sort((a,b) => a.name.localeCompare(b.name)) || []);
-        } catch (error: any) {
-            console.error(`فشل في جلب البيانات: ${error.message}`);
-            setMessage({ type: 'error', text: `فشل في جلب البيانات: ${error.message}` });
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     const resetForm = () => {
         setSearchQuery('');
@@ -62,11 +33,9 @@ export const PermissionsView: React.FC = () => {
     }
 
     useEffect(() => {
-        resetForm(); // Reset selections when permission type changes
+        resetForm();
     }, [permissionType]);
 
-
-    // Memos for filtering and searching students
     const filteredStudentsByDormitory = useMemo(() => {
         if (!selectedDormitoryId) return [];
         return students.filter(s => s.dormitory_id === selectedDormitoryId);
@@ -157,6 +126,7 @@ export const PermissionsView: React.FC = () => {
             setMessage({ type: 'error', text: `فشل تسجيل الإذن: ${error.message}` });
         } else {
             setMessage({ type: 'success', text: `تم تسجيل الإذن لـ ${permissionsToInsert.length} طالب بنجاح.` });
+            refetchData();
             resetForm();
         }
     };

@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Class, Student, PermissionType } from '../../types';
+import { Student, PermissionType } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
+import { useAcademicData } from '../../contexts/AcademicDataContext';
 
 export const PermissionsView: React.FC = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -11,31 +12,10 @@ export const PermissionsView: React.FC = () => {
     const [permissionType, setPermissionType] = useState<PermissionType>(PermissionType.PERMISSION);
     const [reason, setReason] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
+    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
-    const [classes, setClasses] = useState<Class[]>([]);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function fetchData() {
-            setLoading(true);
-            try {
-                const { data: classesData, error: classesError } = await supabase.from('classes').select('*');
-                if (classesError) throw classesError;
-                setClasses(classesData || []);
-
-                const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('class_id', 'is', null);
-                if (studentsError) throw studentsError;
-                setStudents(studentsData || []);
-            } catch (error: any) {
-                console.error(`فشل في جلب البيانات: ${error.message}`);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchData();
-    }, []);
-
+    const { classes, students, loading, refetchData } = useAcademicData();
+    
     const filteredStudentsByClass = useMemo(() => {
         if (!selectedClassId) return [];
         return students.filter(s => s.class_id === selectedClassId);
@@ -49,14 +29,12 @@ export const PermissionsView: React.FC = () => {
     }, [searchQuery, students]);
 
     useEffect(() => {
-        // Reset student selection when class changes
         setSelectedStudentId('');
     }, [selectedClassId]);
     
     const handleStudentSearchSelect = (student: Student) => {
         setSearchQuery(student.name);
         setSelectedClassId(student.class_id || '');
-        // Use a timeout to allow the class dropdown to update and re-render the student dropdown
         setTimeout(() => {
             setSelectedStudentId(student.id);
         }, 0);
@@ -65,8 +43,9 @@ export const PermissionsView: React.FC = () => {
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setMessage(null);
         if (!selectedStudentId || !date || !permissionType) {
-            console.error('يرجى ملء جميع الحقول المطلوبة.');
+            setMessage({type: 'error', text: 'يرجى ملء جميع الحقول المطلوبة.'});
             return;
         }
         
@@ -74,11 +53,14 @@ export const PermissionsView: React.FC = () => {
             student_id: selectedStudentId,
             date,
             type: permissionType,
+            reason, // Sertakan alasan
         });
 
         if (error) {
-            console.error(`فشل تسجيل الإذن: ${error.message}`);
+            setMessage({type: 'error', text: `فشل تسجيل الإذن: ${error.message}`});
         } else {
+            setMessage({type: 'success', text: 'تم تسجيل الإذن بنجاح.'});
+            refetchData(); // Refresh data terpusat
             // Reset form
             setSearchQuery('');
             setSelectedClassId('');
@@ -94,9 +76,13 @@ export const PermissionsView: React.FC = () => {
     return (
         <div className="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200">
             <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">تسجيل إذن جديد</h2>
+             {message && (
+                <div className={`p-4 mb-4 rounded-md text-center ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {message.text}
+                </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-6">
                 
-                {/* Date and Search Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label htmlFor="permission-date" className="block text-lg font-semibold text-slate-700 mb-2">تاريخ الإذن</label>
@@ -143,7 +129,6 @@ export const PermissionsView: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Class and Student Dropdowns Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div>
                         <label htmlFor="class-select" className="block text-lg font-semibold text-slate-700 mb-2">الفصل الدراسي</label>
@@ -172,7 +157,6 @@ export const PermissionsView: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Permission Type */}
                 <div>
                      <label className="block text-lg font-semibold text-slate-700 mb-3">نوع الإذن</label>
                      <div className="flex items-center gap-8">
@@ -213,7 +197,6 @@ export const PermissionsView: React.FC = () => {
                     ></textarea>
                 </div>
 
-                {/* Submit Button */}
                 <div className="pt-4 border-t">
                      <button type="submit" className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg text-lg transition-all duration-300 transform hover:scale-105">
                         تسجيل الإذن
