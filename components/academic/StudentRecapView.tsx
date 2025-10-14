@@ -146,28 +146,107 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         return result;
     }, [students, selectedClassId, searchQuery]);
 
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const handleExportPDF = async () => {
-        const studentName = students.find(s => s.id === selectedStudentId)?.name;
-        if (!recapContentRef.current || !studentName) {
-            console.error("Ref or student name is missing.");
-            return;
+    const generateReportCanvas = async (): Promise<HTMLCanvasElement | null> => {
+        const reportElement = recapContentRef.current;
+        if (!reportElement) {
+            console.error("Report element ref is missing.");
+            return null;
         }
-        
-        setIsExporting(true);
+
+        const scrollableLog = reportElement.querySelector('.js-log-container') as HTMLElement;
+        let originalLogMaxHeight = '';
+        let originalLogOverflowY = '';
+
+        if (scrollableLog) {
+            originalLogMaxHeight = scrollableLog.style.maxHeight;
+            originalLogOverflowY = scrollableLog.style.overflowY;
+        }
+
         try {
-            const { jsPDF } = window.jspdf;
-            const canvas = await window.html2canvas(recapContentRef.current, {
+            // Temporarily modify styles for full content capture
+            if (scrollableLog) {
+                scrollableLog.style.maxHeight = 'none';
+                scrollableLog.style.overflowY = 'visible';
+            }
+
+            const canvas = await window.html2canvas(reportElement, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
             });
             
+            return canvas;
+        } finally {
+            // Revert styles
+            if (scrollableLog) {
+                scrollableLog.style.maxHeight = originalLogMaxHeight;
+                scrollableLog.style.overflowY = originalLogOverflowY;
+            }
+        }
+    };
+
+    const handlePrint = async () => {
+        setIsExporting(true); // Reuse state to show loading/disabled state
+        try {
+            const canvas = await generateReportCanvas();
+            if (!canvas) throw new Error("Canvas generation failed.");
+
+            const imgData = canvas.toDataURL('image/png');
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("Please allow popups for this site to print.");
+                setIsExporting(false);
+                return;
+            }
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>طباعة التقرير</title>
+                    <style>
+                        @page { size: landscape; margin: 0; }
+                        body { margin: 0; }
+                        img { width: 100%; height: 100%; object-fit: contain; }
+                    </style>
+                </head>
+                <body>
+                    <img src="${imgData}" />
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            
+            printWindow.onload = () => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+            };
+
+        } catch (error) {
+            console.error("Error preparing for print:", error);
+            alert("حدث خطأ أثناء إعداد الطباعة. يرجى المحاولة مرة أخرى.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleExportPDF = async () => {
+        const studentName = students.find(s => s.id === selectedStudentId)?.name;
+        if (!studentName) {
+            console.error("Student name is missing for PDF export.");
+            return;
+        }
+        
+        setIsExporting(true);
+        try {
+            const canvas = await generateReportCanvas();
+            if (!canvas) throw new Error("Canvas generation failed.");
+            
             const imgData = canvas.toDataURL('image/png');
             
+            const { jsPDF } = window.jspdf;
             const doc = new jsPDF({
                 orientation: 'landscape',
                 unit: 'mm',
@@ -182,21 +261,21 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             const canvasHeight = canvas.height;
             const canvasAspectRatio = canvasWidth / canvasHeight;
 
-            const pdfWidth = A4_WIDTH - MARGIN * 2;
-            const pdfHeight = A4_HEIGHT - MARGIN * 2;
-            const pdfAspectRatio = pdfWidth / pdfHeight;
+            const pdfImageWidth = A4_WIDTH - MARGIN * 2;
+            const pdfImageHeight = A4_HEIGHT - MARGIN * 2;
 
             let finalWidth, finalHeight;
-            if (canvasAspectRatio > pdfAspectRatio) {
-                finalWidth = pdfWidth;
-                finalHeight = pdfWidth / canvasAspectRatio;
+
+            if (canvasAspectRatio > (pdfImageWidth / pdfImageHeight)) {
+                finalWidth = pdfImageWidth;
+                finalHeight = (pdfImageWidth * canvasHeight) / canvasWidth;
             } else {
-                finalHeight = pdfHeight;
-                finalWidth = pdfHeight * canvasAspectRatio;
+                finalHeight = pdfImageHeight;
+                finalWidth = (pdfImageHeight * canvasWidth) / canvasHeight;
             }
             
-            const x = MARGIN + (pdfWidth - finalWidth) / 2;
-            const y = MARGIN + (pdfHeight - finalHeight) / 2;
+            const x = MARGIN + (pdfImageWidth - finalWidth) / 2;
+            const y = MARGIN + (pdfImageHeight - finalHeight) / 2;
             
             doc.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
 
@@ -233,10 +312,11 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         </button>
                          <button
                             onClick={handlePrint}
-                            className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                            disabled={isExporting}
+                            className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                         >
                             <PrinterIcon className="w-5 h-5" />
-                            <span>طباعة</span>
+                            <span>{isExporting ? '...جاري الطباعة' : 'طباعة'}</span>
                         </button>
                     </div>
                 )}
@@ -304,7 +384,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                                         <h4 className="font-bold text-slate-800 mb-2 border-b-2 border-slate-200 pb-2">سجل الإذن والمرض</h4>
-                                         <div className="overflow-y-auto max-h-48">
+                                         <div className="overflow-y-auto max-h-48 js-log-container">
                                             <table className="w-full text-sm text-right">
                                                 <tbody>
                                                     {studentData.allEvents.length > 0 ? studentData.allEvents.map(event => (

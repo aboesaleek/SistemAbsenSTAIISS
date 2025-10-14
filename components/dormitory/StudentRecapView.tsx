@@ -182,34 +182,107 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         return result;
     }, [students, selectedDormitoryId, searchQuery]);
 
-    const handlePrint = () => {
-        window.print();
-    };
-
-    const handleExportPDF = async () => {
-        const studentName = students.find(s => s.id === selectedStudentId)?.name;
-        if (!recapContentRef.current || !studentName) {
-            console.error("Ref or student name is missing.");
-            return;
+    const generateReportCanvas = async (): Promise<HTMLCanvasElement | null> => {
+        const reportElement = recapContentRef.current;
+        if (!reportElement) {
+            console.error("Report element ref is missing.");
+            return null;
         }
-        
-        setIsExporting(true);
+
+        const scrollableContainers = reportElement.querySelectorAll('.js-log-container');
+        const originalStyles: { element: HTMLElement; maxHeight: string; overflowY: string }[] = [];
+
         try {
-            const { jsPDF } = window.jspdf;
-            const canvas = await window.html2canvas(recapContentRef.current, {
+            scrollableContainers.forEach(container => {
+                const el = container as HTMLElement;
+                originalStyles.push({ element: el, maxHeight: el.style.maxHeight, overflowY: el.style.overflowY });
+                el.style.maxHeight = 'none';
+                el.style.overflowY = 'visible';
+            });
+
+            const canvas = await window.html2canvas(reportElement, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
             });
             
+            return canvas;
+        } finally {
+            originalStyles.forEach(({ element, maxHeight, overflowY }) => {
+                element.style.maxHeight = maxHeight;
+                element.style.overflowY = overflowY;
+            });
+        }
+    };
+
+    const handlePrint = async () => {
+        setIsExporting(true);
+        try {
+            const canvas = await generateReportCanvas();
+            if (!canvas) throw new Error("Canvas generation failed.");
+
+            const imgData = canvas.toDataURL('image/png');
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("Please allow popups for this site to print.");
+                setIsExporting(false);
+                return;
+            }
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>طباعة التقرير</title>
+                    <style>
+                        @page { size: landscape; margin: 0; }
+                        body { margin: 0; }
+                        img { width: 100%; height: 100%; object-fit: contain; }
+                    </style>
+                </head>
+                <body>
+                    <img src="${imgData}" />
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            
+            printWindow.onload = () => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+            };
+
+        } catch (error) {
+            console.error("Error preparing for print:", error);
+            alert("حدث خطأ أثناء إعداد الطباعة. يرجى المحاولة مرة أخرى.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleExportPDF = async () => {
+        const studentName = students.find(s => s.id === selectedStudentId)?.name;
+        if (!studentName) {
+            console.error("Student name is missing for PDF export.");
+            return;
+        }
+        
+        setIsExporting(true);
+        try {
+            const canvas = await generateReportCanvas();
+            if (!canvas) throw new Error("Canvas generation failed.");
+            
             const imgData = canvas.toDataURL('image/png');
             
+            const { jsPDF } = window.jspdf;
             const doc = new jsPDF({
                 orientation: 'landscape',
                 unit: 'mm',
                 format: 'a4',
             });
-
+            
             const A4_WIDTH = 297;
             const A4_HEIGHT = 210;
             const MARGIN = 10;
@@ -218,21 +291,21 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             const canvasHeight = canvas.height;
             const canvasAspectRatio = canvasWidth / canvasHeight;
 
-            const pdfWidth = A4_WIDTH - MARGIN * 2;
-            const pdfHeight = A4_HEIGHT - MARGIN * 2;
-            const pdfAspectRatio = pdfWidth / pdfHeight;
+            const pdfImageWidth = A4_WIDTH - MARGIN * 2;
+            const pdfImageHeight = A4_HEIGHT - MARGIN * 2;
 
             let finalWidth, finalHeight;
-            if (canvasAspectRatio > pdfAspectRatio) {
-                finalWidth = pdfWidth;
-                finalHeight = pdfWidth / canvasAspectRatio;
+
+            if (canvasAspectRatio > (pdfImageWidth / pdfImageHeight)) {
+                finalWidth = pdfImageWidth;
+                finalHeight = (pdfImageWidth * canvasHeight) / canvasWidth;
             } else {
-                finalHeight = pdfHeight;
-                finalWidth = pdfHeight * canvasAspectRatio;
+                finalHeight = pdfImageHeight;
+                finalWidth = (pdfImageHeight * canvasWidth) / canvasHeight;
             }
             
-            const x = MARGIN + (pdfWidth - finalWidth) / 2;
-            const y = MARGIN + (pdfHeight - finalHeight) / 2;
+            const x = MARGIN + (pdfImageWidth - finalWidth) / 2;
+            const y = MARGIN + (pdfImageHeight - finalHeight) / 2;
             
             doc.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
 
@@ -247,6 +320,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             setIsExporting(false);
         }
     };
+
 
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
@@ -268,10 +342,11 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         </button>
                          <button
                             onClick={handlePrint}
-                            className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                            disabled={isExporting}
+                            className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                         >
                             <PrinterIcon className="w-5 h-5" />
-                            <span>طباعة</span>
+                            <span>{isExporting ? '...جاري الطباعة' : 'طباعة'}</span>
                         </button>
                     </div>
                 )}
@@ -311,6 +386,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             {selectedStudentId && (
               <div ref={recapContentRef} className="printable-area">
                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4">
+                    <h3 className="text-2xl font-bold text-slate-800 mb-4 text-center">{students.find(s=>s.id === selectedStudentId)?.name}</h3>
                     <div className="flex justify-center border-b no-print">
                         <MainTabButton isActive={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')}>ملخص الأذونات</MainTabButton>
                         <MainTabButton isActive={activeTab === 'prayerAbsences'} onClick={() => setActiveTab('prayerAbsences')}>غياب الصلاة</MainTabButton>
@@ -342,7 +418,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         
                             <div>
                                 <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل الإذن</h3>
-                                <div className="overflow-x-auto max-h-96 border rounded-lg">
+                                <div className="overflow-x-auto max-h-96 border rounded-lg js-log-container">
                                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
@@ -403,7 +479,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         
                             <div>
                                 <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل غياب الصلاة</h3>
-                                <div className="overflow-x-auto max-h-96 border rounded-lg">
+                                <div className="overflow-x-auto max-h-96 border rounded-lg js-log-container">
                                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
@@ -460,7 +536,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         
                             <div>
                                 <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل سجل غياب المراسم</h3>
-                                <div className="overflow-x-auto max-h-96 border rounded-lg">
+                                <div className="overflow-x-auto max-h-96 border rounded-lg js-log-container">
                                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
