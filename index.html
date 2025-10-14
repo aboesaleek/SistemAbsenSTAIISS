@@ -25,12 +25,26 @@
           left: 0;
           top: 0;
           width: 100%;
-          padding: 2rem;
+          height: auto;
+          margin: 0;
+          padding: 0;
+          border: none;
+          box-shadow: none;
         }
         .no-print {
           display: none !important;
         }
+        .printable-area .no-print-link {
+          display: none !important;
+        }
+        .printable-area .print-only-text {
+          display: inline !important;
+          visibility: visible !important;
+        }
       }
+       .print-only-text {
+          display: none;
+       }
       /* 
         Responsive table styles have been removed to favor horizontal scrolling.
         Tables are now wrapped in a div with `overflow-x-auto` for a better mobile experience.
@@ -50,6 +64,9 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {

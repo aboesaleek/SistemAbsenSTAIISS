@@ -1,7 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { RecapStatus, StudentRecapData } from '../../types';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
+import { DownloadIcon } from '../icons/DownloadIcon';
+
+// Declare jsPDF and html2canvas from window for TypeScript
+declare global {
+  interface Window {
+    jspdf: any;
+    html2canvas: any;
+  }
+}
 
 interface ClassRecapViewProps {
   onStudentSelect: (studentId: string) => void;
@@ -10,6 +19,8 @@ interface ClassRecapViewProps {
 export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect }) => {
     const { classes, records: allRecords, loading } = useAcademicData();
     const [selectedClassId, setSelectedClassId] = useState('');
+    const [isExporting, setIsExporting] = useState(false);
+    const recapContentRef = useRef<HTMLDivElement>(null);
     
     const classRecapData = useMemo((): StudentRecapData[] => {
         if (!selectedClassId) return [];
@@ -44,6 +55,65 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
 
         return Array.from(studentDataMap.values()).sort((a,b) => a.studentName.localeCompare(b.studentName));
     }, [selectedClassId, allRecords]);
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleExportPDF = async () => {
+        const className = classes.find(c => c.id === selectedClassId)?.name;
+        if (!recapContentRef.current || !className) {
+            console.error("Ref or class name is missing.");
+            return;
+        }
+        
+        setIsExporting(true);
+        try {
+            const { jsPDF } = window.jspdf;
+            const canvas = await window.html2canvas(recapContentRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+            });
+            
+            const imgData = canvas.toDataURL('image/png');
+            
+            const pdfWidth = 297; // A4 landscape width in mm
+            const pdfHeight = 210; // A4 landscape height in mm
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = imgWidth / imgHeight;
+
+            let finalImgWidth = pdfWidth - 20; // with 10mm margin on each side
+            let finalImgHeight = finalImgWidth / ratio;
+            
+            if (finalImgHeight > pdfHeight - 20) {
+                finalImgHeight = pdfHeight - 20;
+                finalImgWidth = finalImgHeight * ratio;
+            }
+            
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4',
+            });
+
+            const x = (pdfWidth - finalImgWidth) / 2;
+            const y = (pdfHeight - finalImgHeight) / 2;
+            
+            doc.addImage(imgData, 'PNG', x, y, finalImgWidth, finalImgHeight);
+
+            const today = new Date().toISOString().split('T')[0];
+            const fileName = `تقرير-فصل-${className.replace(/\s/g, '_')}-${today}.pdf`;
+            
+            doc.save(fileName);
+        } catch (error) {
+            console.error("Error exporting to PDF:", error);
+            alert("حدث خطأ أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
     
     if (loading && !selectedClassId) {
        return (
@@ -58,9 +128,9 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-slate-800">ملخص الفصل</h2>
+            <h2 className="text-3xl font-bold text-slate-800 no-print">ملخص الفصل</h2>
 
-            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4 no-print">
                 <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                      <div>
                         <label htmlFor="class-select-recap" className="block text-lg font-semibold text-slate-700 mb-2">اختر الفصل الدراسي</label>
@@ -75,16 +145,29 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                         </select>
                     </div>
                     {selectedClassId && (
-                         <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                            <PrinterIcon className="w-5 h-5" />
-                            <span>تصدير إلى PDF</span>
-                        </button>
+                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleExportPDF}
+                                disabled={isExporting}
+                                className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+                            >
+                                <DownloadIcon className="w-5 h-5" />
+                                <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
+                            </button>
+                             <button
+                                onClick={handlePrint}
+                                className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <PrinterIcon className="w-5 h-5" />
+                                <span>طباعة</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
 
             {selectedClassId && (
-                <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
+                <div ref={recapContentRef} className="printable-area bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
                     <h3 className="text-xl font-bold text-slate-700 mb-4">
                         ملخص {classes.find(c => c.id === selectedClassId)?.name}
                     </h3>
@@ -105,9 +188,10 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                                 {classRecapData.map(data => (
                                     <tr key={data.studentId} className="bg-white border-b hover:bg-slate-50">
                                         <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
-                                          <button onClick={() => onStudentSelect(data.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
+                                          <button onClick={() => onStudentSelect(data.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer no-print-link">
                                               {data.studentName}
                                           </button>
+                                          <span className="print-only-text">{data.studentName}</span>
                                         </td>
                                         <td data-label="غائب" className="px-6 py-4 whitespace-nowrap">{data.absentCount}</td>
                                         <td data-label="إذن" className="px-6 py-4 whitespace-nowrap">{data.permissionCount}</td>

@@ -5,6 +5,13 @@ import { DownloadIcon } from '../icons/DownloadIcon';
 import { supabase } from '../../supabaseClient';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 
+// Declare XLSX from window for TypeScript
+declare global {
+  interface Window {
+    XLSX: any;
+  }
+}
+
 interface CombinedRecord extends AttendanceRecord {
     sourceId: string;
     sourceType: 'permission' | 'absence';
@@ -58,6 +65,42 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
             refetchData(); // Refresh data terpusat
         }
     };
+
+    const handleExportXLSX = () => {
+        if (!filteredRecords.length) {
+            alert('لا توجد بيانات لتصديرها.');
+            return;
+        }
+
+        const headers = ['#', 'اسم الطالب', 'الفصل', 'التاريخ', 'الحالة', 'المادة'];
+        const data = filteredRecords.map((record, index) => [
+            index + 1,
+            record.studentName,
+            record.className,
+            record.date,
+            record.status,
+            record.courseName || '-'
+        ]);
+
+        const ws = window.XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+        if (!ws['!props']) ws['!props'] = {};
+        ws['!props'].RTL = true;
+
+        ws['!cols'] = [
+            { wch: 5 },  // #
+            { wch: 30 }, // اسم الطالب
+            { wch: 20 }, // الفصل
+            { wch: 15 }, // التاريخ
+            { wch: 10 }, // الحالة
+            { wch: 20 }  // المادة
+        ];
+
+        const wb = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(wb, ws, 'ملخص الغياب');
+        const today = new Date().toISOString().split('T')[0];
+        window.XLSX.writeFile(wb, `تقرير-الغياب-العام-${today}.xlsx`);
+    };
     
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
@@ -97,9 +140,12 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
                         className="w-full p-2 border border-slate-300 rounded-lg"
                     />
                 </div>
-                <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                <button
+                  onClick={handleExportXLSX}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                >
                     <DownloadIcon className="w-5 h-5" />
-                    <span>تصدير إلى Excel</span>
+                    <span>تصدير إلى XLSX</span>
                 </button>
             </div>
 

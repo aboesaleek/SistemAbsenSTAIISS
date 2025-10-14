@@ -1,9 +1,18 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Dormitory, Student, DormitoryPermissionType } from '../../types';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
+import { DownloadIcon } from '../icons/DownloadIcon';
+
+// Declare jsPDF and html2canvas from window for TypeScript
+declare global {
+  interface Window {
+    jspdf: any;
+    html2canvas: any;
+  }
+}
 
 interface RecapRecord {
     id: string;
@@ -26,6 +35,8 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
     const { dormitories, students, permissionRecords, loading, refetchData } = useDormitoryData();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
+    const recapContentRef = useRef<HTMLDivElement>(null);
+    const [isExporting, setIsExporting] = useState(false);
 
     const records = useMemo(() => {
         const studentsMap = new Map<string, Student>(students.map(s => [s.id, s]));
@@ -68,18 +79,87 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
 
     const handlePrint = () => window.print();
 
+    const handleExportPDF = async () => {
+        if (!recapContentRef.current) {
+            console.error("Ref is missing.");
+            return;
+        }
+        
+        setIsExporting(true);
+        try {
+            const { jsPDF } = window.jspdf;
+            const canvas = await window.html2canvas(recapContentRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+            });
+            
+            const imgData = canvas.toDataURL('image/png');
+            
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4',
+            });
+            
+            const A4_WIDTH = 297;
+            const A4_HEIGHT = 210;
+            const MARGIN = 10;
+            
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            const canvasAspectRatio = canvasWidth / canvasHeight;
+
+            const pdfWidth = A4_WIDTH - MARGIN * 2;
+            const pdfHeight = A4_HEIGHT - MARGIN * 2;
+            const pdfAspectRatio = pdfWidth / pdfHeight;
+
+            let finalWidth, finalHeight;
+            if (canvasAspectRatio > pdfAspectRatio) {
+                finalWidth = pdfWidth;
+                finalHeight = pdfWidth / canvasAspectRatio;
+            } else {
+                finalHeight = pdfHeight;
+                finalWidth = pdfHeight * canvasAspectRatio;
+            }
+            
+            const x = MARGIN + (pdfWidth - finalWidth) / 2;
+            const y = MARGIN + (pdfHeight - finalHeight) / 2;
+            
+            doc.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+
+            const today = new Date().toISOString().split('T')[0];
+            const fileName = `تقرير-${title.replace(/\s/g, '_')}-${today}.pdf`;
+            
+            doc.save(fileName);
+        } catch (error) {
+            console.error("Error exporting to PDF:", error);
+            alert("حدث خطأ أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     if (loading) {
         return <div className="text-center p-8 bg-white rounded-2xl shadow-lg border">...جاري تحميل البيانات</div>;
     }
     
     return (
-        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 printable-area">
+        <div ref={recapContentRef} className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 printable-area">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
-                <div className="no-print">
+                <div className="no-print flex items-center gap-2">
+                    <button
+                        onClick={handleExportPDF}
+                        disabled={isExporting}
+                        className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+                    >
+                        <DownloadIcon className="w-5 h-5" />
+                        <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
+                    </button>
                     <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
                         <PrinterIcon className="w-5 h-5" />
-                        <span>طباعة أو حفظ كـ PDF</span>
+                        <span>طباعة</span>
                     </button>
                 </div>
             </div>
@@ -118,9 +198,10 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
                             <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
                                 <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
                                 <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
-                                     <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">
+                                     <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer no-print-link">
                                         {record.studentName}
                                     </button>
+                                    <span className="print-only-text">{record.studentName}</span>
                                 </td>
                                 <td data-label="المهجع" className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
                                 <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>

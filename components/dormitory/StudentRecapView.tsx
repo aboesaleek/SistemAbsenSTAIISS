@@ -1,8 +1,18 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { DormitoryPermissionType, CeremonyStatus, ceremonyStatusToLabel } from '../../types';
 import { supabase } from '../../supabaseClient';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
+import { PrinterIcon } from '../icons/PrinterIcon';
+import { DownloadIcon } from '../icons/DownloadIcon';
+
+// Declare jsPDF and html2canvas from window for TypeScript
+declare global {
+  interface Window {
+    jspdf: any;
+    html2canvas: any;
+  }
+}
 
 const StatCard: React.FC<{ label: string; value: number; gradient: string }> = ({ label, value, gradient }) => (
     <div className={`text-white p-4 rounded-xl shadow-lg bg-gradient-to-br ${gradient}`}>
@@ -87,6 +97,8 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [selectedStudentId, setSelectedStudentId] = useState(preselectedStudentId || '');
     const [activeTab, setActiveTab] = useState<'permissions' | 'prayerAbsences' | 'ceremonyAbsences'>('permissions');
+    const [isExporting, setIsExporting] = useState(false);
+    const recapContentRef = useRef<HTMLDivElement>(null);
 
     const deleteAbsenceRecord = async (id: string, type: 'prayer' | 'ceremony') => {
         const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
@@ -170,15 +182,102 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         return result;
     }, [students, selectedDormitoryId, searchQuery]);
 
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleExportPDF = async () => {
+        const studentName = students.find(s => s.id === selectedStudentId)?.name;
+        if (!recapContentRef.current || !studentName) {
+            console.error("Ref or student name is missing.");
+            return;
+        }
+        
+        setIsExporting(true);
+        try {
+            const { jsPDF } = window.jspdf;
+            const canvas = await window.html2canvas(recapContentRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+            });
+            
+            const imgData = canvas.toDataURL('image/png');
+            
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4',
+            });
+
+            const A4_WIDTH = 297;
+            const A4_HEIGHT = 210;
+            const MARGIN = 10;
+            
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            const canvasAspectRatio = canvasWidth / canvasHeight;
+
+            const pdfWidth = A4_WIDTH - MARGIN * 2;
+            const pdfHeight = A4_HEIGHT - MARGIN * 2;
+            const pdfAspectRatio = pdfWidth / pdfHeight;
+
+            let finalWidth, finalHeight;
+            if (canvasAspectRatio > pdfAspectRatio) {
+                finalWidth = pdfWidth;
+                finalHeight = pdfWidth / canvasAspectRatio;
+            } else {
+                finalHeight = pdfHeight;
+                finalWidth = pdfHeight * canvasAspectRatio;
+            }
+            
+            const x = MARGIN + (pdfWidth - finalWidth) / 2;
+            const y = MARGIN + (pdfHeight - finalHeight) / 2;
+            
+            doc.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+
+            const today = new Date().toISOString().split('T')[0];
+            const fileName = `تقرير-غياب-${studentName.replace(/\s/g, '_')}-${today}.pdf`;
+            
+            doc.save(fileName);
+        } catch (error) {
+            console.error("Error exporting to PDF:", error);
+            alert("حدث خطأ أثناء تصدير الملف. يرجى المحاولة مرة أخرى.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
     }
 
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-slate-800">ملخص الطالب</h2>
+            <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-bold text-slate-800">ملخص الطالب</h2>
+                 {(permissionData || prayerAbsenceData || ceremonyAbsenceData) && (
+                    <div className="flex items-center gap-2 no-print">
+                        <button
+                            onClick={handleExportPDF}
+                            disabled={isExporting}
+                            className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+                        >
+                            <DownloadIcon className="w-5 h-5" />
+                            <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
+                        </button>
+                         <button
+                            onClick={handlePrint}
+                            className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            <PrinterIcon className="w-5 h-5" />
+                            <span>طباعة</span>
+                        </button>
+                    </div>
+                )}
+            </div>
             
-            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4 no-print">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <input
                         type="text"
@@ -210,8 +309,9 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             </div>
 
             {selectedStudentId && (
-                <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
-                    <div className="flex justify-center border-b">
+              <div ref={recapContentRef} className="printable-area">
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4">
+                    <div className="flex justify-center border-b no-print">
                         <MainTabButton isActive={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')}>ملخص الأذونات</MainTabButton>
                         <MainTabButton isActive={activeTab === 'prayerAbsences'} onClick={() => setActiveTab('prayerAbsences')}>غياب الصلاة</MainTabButton>
                         <MainTabButton isActive={activeTab === 'ceremonyAbsences'} onClick={() => setActiveTab('ceremonyAbsences')}>غياب المراسم</MainTabButton>
@@ -251,7 +351,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                 <th className="px-6 py-3 whitespace-nowrap">النوع</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">عدد الأيام</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">البيان</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
+                                                <th className="px-6 py-3 whitespace-nowrap no-print">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
@@ -263,7 +363,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
                                                         <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.number_of_days}</td>
                                                         <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
-                                                        <td className="px-6 py-4 action-cell whitespace-nowrap">
+                                                        <td className="px-6 py-4 action-cell whitespace-nowrap no-print">
                                                             <button onClick={() => deletePermissionRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
@@ -311,7 +411,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                 <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">الصلاة</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
+                                                <th className="px-6 py-3 whitespace-nowrap no-print">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
@@ -322,7 +422,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
                                                         <td data-label="الصلاة" className="px-6 py-4 whitespace-nowrap">{record.prayer}</td>
                                                         <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
-                                                        <td className="px-6 py-4 action-cell whitespace-nowrap">
+                                                        <td className="px-6 py-4 action-cell whitespace-nowrap no-print">
                                                             <button onClick={() => deleteAbsenceRecord(record.id, 'prayer')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
@@ -367,7 +467,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                 <th className="px-6 py-3 whitespace-nowrap">#</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
                                                 <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
+                                                <th className="px-6 py-3 whitespace-nowrap no-print">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
@@ -377,7 +477,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
                                                         <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
                                                         <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
-                                                        <td className="px-6 py-4 action-cell whitespace-nowrap">
+                                                        <td className="px-6 py-4 action-cell whitespace-nowrap no-print">
                                                             <button onClick={() => deleteAbsenceRecord(record.id, 'ceremony')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
@@ -392,6 +492,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         </div>
                     )}
                 </div>
+              </div>
             )}
         </div>
     );
