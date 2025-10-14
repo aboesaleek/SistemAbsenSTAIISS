@@ -4,6 +4,7 @@ import { DeleteIcon } from '../icons/DeleteIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { supabase } from '../../supabaseClient';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
+import { Pagination } from '../shared/Pagination';
 
 // Declare XLSX from window for TypeScript
 declare global {
@@ -34,6 +35,8 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
     const [selectedClassId, setSelectedClassId] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Transform records from context to include sourceId and sourceType for deletion
     const combinedRecords = useMemo((): CombinedRecord[] => {
@@ -54,6 +57,11 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
             return matchesSearch && matchesClass && matchesStartDate && matchesEndDate;
         });
     }, [combinedRecords, searchQuery, selectedClassId, startDate, endDate]);
+
+    const paginatedRecords = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredRecords.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredRecords, currentPage, itemsPerPage]);
 
     const deleteRecord = async (record: CombinedRecord) => {
         const tableName = record.sourceType === 'permission' ? 'academic_permissions' : 'academic_absences';
@@ -116,12 +124,12 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
                         type="text"
                         placeholder="بحث باسم الطالب..."
                         value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
+                        onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                         className="w-full p-2 border border-slate-300 rounded-lg"
                     />
                     <select
                         value={selectedClassId}
-                        onChange={e => setSelectedClassId(e.target.value)}
+                        onChange={e => { setSelectedClassId(e.target.value); setCurrentPage(1); }}
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
                         <option value="">كل الفصول</option>
@@ -130,13 +138,13 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
                     <input
                         type="date"
                         value={startDate}
-                        onChange={e => setStartDate(e.target.value)}
+                        onChange={e => { setStartDate(e.target.value); setCurrentPage(1); }}
                         className="w-full p-2 border border-slate-300 rounded-lg"
                     />
                     <input
                         type="date"
                         value={endDate}
-                        onChange={e => setEndDate(e.target.value)}
+                        onChange={e => { setEndDate(e.target.value); setCurrentPage(1); }}
                         className="w-full p-2 border border-slate-300 rounded-lg"
                     />
                 </div>
@@ -149,48 +157,57 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
                 </button>
             </div>
 
-            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-right text-slate-600 responsive-table">
-                        <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                            <tr>
-                                <th className="px-6 py-3 whitespace-nowrap">#</th>
-                                <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
-                                <th className="px-6 py-3 whitespace-nowrap">الفصل</th>
-                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                                <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
-                                <th className="px-6 py-3 whitespace-nowrap">إجراء</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredRecords.map((record, index) => (
-                                <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                    <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
-                                    <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
-                                      <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
-                                          {record.studentName}
-                                      </button>
-                                    </td>
-                                    <td data-label="الفصل" className="px-6 py-4 whitespace-nowrap">{record.className}</td>
-                                    <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
-                                    <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColorMap[record.status]}`}>
-                                            {record.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 action-cell whitespace-nowrap">
-                                        <button onClick={() => deleteRecord(record)} className="text-red-600 hover:text-red-800">
-                                            <DeleteIcon className="w-5 h-5" />
-                                        </button>
-                                    </td>
+            <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+                 <div className="p-2 sm:p-6">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-right text-slate-600 responsive-table">
+                            <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">#</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الفصل</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">التاريخ</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الحالة</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">إجراء</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                     {filteredRecords.length === 0 && (
-                        <p className="text-center text-slate-500 py-8">لا توجد بيانات تطابق معايير البحث.</p>
-                    )}
+                            </thead>
+                            <tbody>
+                                {paginatedRecords.map((record, index) => (
+                                    <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
+                                        <td data-label="#" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{((currentPage - 1) * itemsPerPage) + index + 1}</td>
+                                        <td data-label="اسم الطالب" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">
+                                          <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
+                                              {record.studentName}
+                                          </button>
+                                        </td>
+                                        <td data-label="الفصل" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.className}</td>
+                                        <td data-label="التاريخ" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.date}</td>
+                                        <td data-label="الحالة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColorMap[record.status]}`}>
+                                                {record.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap">
+                                            <button onClick={() => deleteRecord(record)} className="text-red-600 hover:text-red-800">
+                                                <DeleteIcon className="w-5 h-5" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {paginatedRecords.length === 0 && (
+                            <p className="text-center text-slate-500 py-8">لا توجد بيانات تطابق معايير البحث.</p>
+                        )}
+                    </div>
                 </div>
+                 <Pagination
+                    currentPage={currentPage}
+                    totalItems={filteredRecords.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+                />
             </div>
         </div>
     );

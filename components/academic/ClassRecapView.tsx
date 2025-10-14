@@ -167,7 +167,7 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
             </div>
 
             {selectedClassId && (
-                <div ref={recapContentRef} className="printable-area bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
+                <div ref={recapContentRef} className="printable-area bg-white p-2 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
                     <h3 className="text-xl font-bold text-slate-700 mb-4">
                         ملخص {classes.find(c => c.id === selectedClassId)?.name}
                     </h3>
@@ -176,28 +176,28 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                         <table className="w-full text-sm text-right text-slate-600 responsive-table">
                             <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                                 <tr>
-                                    <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
-                                    <th className="px-6 py-3 whitespace-nowrap">غائب</th>
-                                    <th className="px-6 py-3 whitespace-nowrap">إذن</th>
-                                    <th className="px-6 py-3 whitespace-nowrap">مرض</th>
-                                    <th className="px-6 py-3 whitespace-nowrap">المجموع</th>
-                                    <th className="px-6 py-3 whitespace-nowrap">مجموع الأيام</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">غائب</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">إذن</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">مرض</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">المجموع</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">مجموع الأيام</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {classRecapData.map(data => (
                                     <tr key={data.studentId} className="bg-white border-b hover:bg-slate-50">
-                                        <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
+                                        <td data-label="اسم الطالب" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">
                                           <button onClick={() => onStudentSelect(data.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer no-print-link">
                                               {data.studentName}
                                           </button>
                                           <span className="print-only-text">{data.studentName}</span>
                                         </td>
-                                        <td data-label="غائب" className="px-6 py-4 whitespace-nowrap">{data.absentCount}</td>
-                                        <td data-label="إذن" className="px-6 py-4 whitespace-nowrap">{data.permissionCount}</td>
-                                        <td data-label="مرض" className="px-6 py-4 whitespace-nowrap">{data.sickCount}</td>
-                                        <td data-label="المجموع" className="px-6 py-4 font-bold whitespace-nowrap">{data.total}</td>
-                                        <td data-label="مجموع الأيام" className="px-6 py-4 font-bold text-teal-600 whitespace-nowrap">{data.uniqueDays}</td>
+                                        <td data-label="غائب" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{data.absentCount}</td>
+                                        <td data-label="إذن" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{data.permissionCount}</td>
+                                        <td data-label="مرض" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{data.sickCount}</td>
+                                        <td data-label="المجموع" className="px-2 py-3 sm:px-6 sm:py-4 font-bold whitespace-nowrap">{data.total}</td>
+                                        <td data-label="مجموع الأيام" className="px-2 py-3 sm:px-6 sm:py-4 font-bold text-teal-600 whitespace-nowrap">{data.uniqueDays}</td>
                                     </tr>
                                 ))}
                             </tbody>

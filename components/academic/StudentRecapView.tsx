@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { AttendanceRecord, RecapStatus } from '../../types';
+import { AttendanceRecord, RecapStatus, Student } from '../../types';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
@@ -90,6 +90,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [selectedStudentId, setSelectedStudentId] = useState(preselectedStudentId || '');
     const [isExporting, setIsExporting] = useState(false);
     const recapContentRef = useRef<HTMLDivElement>(null);
+    const [showSearchResults, setShowSearchResults] = useState(false);
     
     useEffect(() => {
       if (preselectedStudentId && students.length > 0) {
@@ -97,6 +98,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         if (student) {
           setSelectedClassId(student.class_id || '');
           setSelectedStudentId(student.id);
+          setSearchQuery(student.name);
         }
       }
     }, [preselectedStudentId, students]);
@@ -135,16 +137,24 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         };
     }, [selectedStudentId, allRecords]);
 
-    const filteredStudents = useMemo(() => {
-        let result = students;
-        if (selectedClassId) {
-            result = result.filter(s => s.class_id === selectedClassId);
-        }
-        if (searchQuery) {
-            result = result.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-        return result;
-    }, [students, selectedClassId, searchQuery]);
+    const allSearchedStudents = useMemo(() => {
+        if (!searchQuery) return [];
+        const selectedStudentName = students.find(s => s.id === selectedStudentId)?.name;
+        if (searchQuery === selectedStudentName) return [];
+        return students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }, [searchQuery, students, selectedStudentId]);
+
+    const studentsInSelectedClass = useMemo(() => {
+        if (!selectedClassId) return [];
+        return students.filter(s => s.class_id === selectedClassId);
+    }, [students, selectedClassId]);
+    
+    const handleStudentSearchSelect = (student: Student) => {
+        setSearchQuery(student.name);
+        setSelectedClassId(student.class_id || '');
+        setSelectedStudentId(student.id);
+        setShowSearchResults(false);
+    };
 
     const generateReportCanvas = async (): Promise<HTMLCanvasElement | null> => {
         const reportElement = recapContentRef.current;
@@ -323,17 +333,42 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             </div>
             
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4 no-print">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input
-                        type="text"
-                        placeholder="بحث باسم الطالب..."
-                        value={searchQuery}
-                        onChange={e => { setSearchQuery(e.target.value); setSelectedStudentId(''); }}
-                        className="w-full p-2 border border-slate-300 rounded-lg"
-                    />
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="بحث باسم الطالب..."
+                            value={searchQuery}
+                            onChange={e => {
+                                setSearchQuery(e.target.value);
+                                setShowSearchResults(true);
+                                setSelectedStudentId('');
+                            }}
+                            onFocus={() => setShowSearchResults(true)}
+                            onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                            className="w-full p-2 border border-slate-300 rounded-lg"
+                        />
+                        {showSearchResults && allSearchedStudents.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-lg">
+                                {allSearchedStudents.slice(0, 10).map(student => (
+                                    <li
+                                        key={student.id}
+                                        className="p-2 hover:bg-teal-100 cursor-pointer text-sm"
+                                        onClick={() => handleStudentSearchSelect(student)}
+                                    >
+                                        {student.name} - <span className="text-xs text-slate-500">{classes.find(c => c.id === student.class_id)?.name}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                     <select
                         value={selectedClassId}
-                        onChange={e => { setSelectedClassId(e.target.value); setSelectedStudentId(''); }}
+                        onChange={e => {
+                            setSelectedClassId(e.target.value);
+                            setSelectedStudentId('');
+                            setSearchQuery('');
+                        }}
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
                         <option value="">-- اختر الفصل --</option>
@@ -341,12 +376,20 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                     </select>
                     <select
                         value={selectedStudentId}
-                        onChange={e => setSelectedStudentId(e.target.value)}
-                        disabled={filteredStudents.length === 0}
+                        onChange={e => {
+                            const student = students.find(s => s.id === e.target.value);
+                            setSelectedStudentId(e.target.value);
+                            if (student) {
+                                setSearchQuery(student.name);
+                            } else {
+                                setSearchQuery('');
+                            }
+                        }}
+                        disabled={!selectedClassId}
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100"
                     >
                         <option value="">-- اختر الطالب --</option>
-                        {filteredStudents.map(s => (
+                        {studentsInSelectedClass.map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
@@ -415,20 +458,20 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                             <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                                 <thead className="text-xs text-red-800 uppercase bg-red-100">
                                                     <tr>
-                                                        <th className="px-4 py-3 whitespace-nowrap">المادة الدراسية</th>
-                                                        <th className="px-4 py-3 whitespace-nowrap">الغياب الأول</th>
-                                                        <th className="px-4 py-3 whitespace-nowrap">الغياب الثاني</th>
-                                                        <th className="px-4 py-3 whitespace-nowrap">الغياب الثالث</th>
+                                                        <th className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">المادة الدراسية</th>
+                                                        <th className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">الغياب الأول</th>
+                                                        <th className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">الغياب الثاني</th>
+                                                        <th className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">الغياب الثالث</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {studentData.absenceDetailsByCourse.size > 0 ? (
                                                         Array.from(studentData.absenceDetailsByCourse.entries()).map(([course, dates]) => (
                                                             <tr key={course} className="bg-white border-b border-red-100 last:border-b-0 hover:bg-red-50/50">
-                                                                <td data-label="المادة الدراسية" className="px-4 py-3 font-semibold whitespace-nowrap">{course}</td>
-                                                                <td data-label="الغياب الأول" className="px-4 py-3 whitespace-nowrap">{dates[0] || '-'}</td>
-                                                                <td data-label="الغياب الثاني" className="px-4 py-3 whitespace-nowrap">{dates[1] || '-'}</td>
-                                                                <td data-label="الغياب الثالث" className="px-4 py-3 whitespace-nowrap">{dates[2] || '-'}</td>
+                                                                <td data-label="المادة الدراسية" className="px-2 py-2 sm:px-4 sm:py-3 font-semibold whitespace-nowrap">{course}</td>
+                                                                <td data-label="الغياب الأول" className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">{dates[0] || '-'}</td>
+                                                                <td data-label="الغياب الثاني" className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">{dates[1] || '-'}</td>
+                                                                <td data-label="الغياب الثالث" className="px-2 py-2 sm:px-4 sm:py-3 whitespace-nowrap">{dates[2] || '-'}</td>
                                                             </tr>
                                                         ))
                                                     ) : (

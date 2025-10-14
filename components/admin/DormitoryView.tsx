@@ -1,59 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Dormitory, Student } from '../../types';
 import { EditIcon } from '../icons/EditIcon';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
+import { Pagination } from '../shared/Pagination';
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
         <h3 className="text-xl font-bold text-slate-700 mb-4">{title}</h3>
         {children}
-    </div>
-);
-
-const DataTable: React.FC<{
-  headers: string[];
-  data: (string | number)[][];
-  onDelete?: (id: string | number) => Promise<void>;
-  items: (Dormitory | Student)[];
-}> = ({ headers, data, onDelete, items }) => (
-    <div className="overflow-x-auto">
-        <table className="w-full text-sm text-right text-slate-600 responsive-table">
-            <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                <tr>
-                    {headers.map(h => <th key={h} className="px-6 py-3 whitespace-nowrap">{h}</th>)}
-                    <th className="px-6 py-3 whitespace-nowrap">إجراءات</th>
-                </tr>
-            </thead>
-            <tbody>
-                {data.length === 0 ? (
-                    <tr>
-                        <td colSpan={headers.length + 1} className="text-center py-8 text-slate-500">
-                            لا توجد بيانات متاحة.
-                        </td>
-                    </tr>
-                ) : (
-                    data.map((row, rowIndex) => (
-                        <tr key={items[rowIndex].id} className="bg-white border-b hover:bg-slate-50">
-                            {row.map((cell, cellIndex) => <td key={cellIndex} data-label={headers[cellIndex]} className="px-6 py-4 whitespace-nowrap">{cell}</td>)}
-                            <td className="px-6 py-4 action-cell whitespace-nowrap">
-                                <div className="flex gap-3 justify-end">
-                                    <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
-                                        <EditIcon className="w-5 h-5" />
-                                    </button>
-                                    {onDelete && (
-                                        <button onClick={() => onDelete(items[rowIndex].id)} className="text-red-600 hover:text-red-800">
-                                            <DeleteIcon className="w-5 h-5" />
-                                        </button>
-                                    )}
-                                </div>
-                            </td>
-                        </tr>
-                    ))
-                )}
-            </tbody>
-        </table>
     </div>
 );
 
@@ -79,36 +35,51 @@ export const DormitoryView: React.FC = () => {
     const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
     const [activeTab, setActiveTab] = useState<'dormitories' | 'students'>('dormitories');
     
+    // State for pagination and search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+
     const newDormsRef = useRef<HTMLTextAreaElement>(null);
     const newStudentsRef = useRef<HTMLTextAreaElement>(null);
     const newStudentDormRef = useRef<HTMLSelectElement>(null);
 
+    useEffect(() => {
+        setSearchQuery('');
+        setCurrentPage(1);
+    }, [activeTab]);
+
+    const { filteredItems, paginatedItems } = useMemo(() => {
+        let items: (Dormitory | Student)[] = [];
+        if (activeTab === 'dormitories') items = dormitories;
+        else if (activeTab === 'students') items = students;
+
+        const filtered = items.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        const paginated = filtered.slice(
+            (currentPage - 1) * itemsPerPage,
+            currentPage * itemsPerPage
+        );
+        
+        return { filteredItems: filtered, paginatedItems: paginated };
+    }, [activeTab, dormitories, students, searchQuery, currentPage, itemsPerPage]);
+
     async function fetchData() {
         setLoading(true);
         try {
-            const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*');
+            const { data: dormsData, error: dormsError } = await supabase.from('dormitories').select('*').order('name');
             if (dormsError) throw dormsError;
             setDormitories(dormsData || []);
 
             // Fetch only students who have a dormitoryId
-            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitory_id', 'is', null);
+            const { data: studentsData, error: studentsError } = await supabase.from('students').select('*').not('dormitory_id', 'is', null).order('name');
             if (studentsError) throw studentsError;
             setStudents(studentsData || []);
         } catch (error: any) {
             console.error('Error fetching dormitory data:', error);
-            let errorMessage = 'An unknown error occurred.';
-
-            if (error && error.message) {
-                errorMessage = error.message;
-            } else if (typeof error === 'string') {
-                errorMessage = error;
-            }
-
-            if (errorMessage.toLowerCase().includes('security policy') || errorMessage.toLowerCase().includes('rls')) {
-                errorMessage += '\n\n(هذا يعني على الأرجح أن سياسة أمان قاعدة البيانات تمنع الوصول. تحقق من أدوار المستخدم وسياسات RLS.)';
-            }
-
-            console.error(`فشل في جلب بيانات المهجع: ${errorMessage}`);
+            setMessage({ type: 'error', text: 'فشل في جلب بيانات المهجع.' });
         } finally {
             setLoading(false);
         }
@@ -121,7 +92,7 @@ export const DormitoryView: React.FC = () => {
     const handleGenericAdd = async (
         ref: React.RefObject<HTMLTextAreaElement>,
         tableName: string,
-        setLoading: (loading: boolean) => void,
+        setLoadingState: (loading: boolean) => void,
         itemType: string,
         additionalData?: Record<string, any>
     ) => {
@@ -132,15 +103,14 @@ export const DormitoryView: React.FC = () => {
             return;
         }
 
-        setLoading(true);
+        setLoadingState(true);
         setMessage(null);
 
         const items = content.split('\n').map(name => ({ name: name.trim(), ...additionalData })).filter(item => item.name);
         
         if (items.length === 0) {
             setMessage({ type: 'error', text: `يرجى إدخال ${itemType} صالحة لإضافتها.` });
-            setLoading(false);
-            setTimeout(() => setMessage(null), 5000);
+            setLoadingState(false);
             return;
         }
 
@@ -148,33 +118,86 @@ export const DormitoryView: React.FC = () => {
         
         if (error) {
             setMessage({ type: 'error', text: `فشل في الإضافة: ${error.message}` });
-            console.error(`فشل في الإضافة: ${error.message}`);
         } else {
             setMessage({ type: 'success', text: `تمت إضافة ${items.length} ${itemType} بنجاح.` });
             ref.current!.value = '';
             fetchData(); // Refresh data
         }
 
-        setLoading(false);
+        setLoadingState(false);
         setTimeout(() => setMessage(null), 5000);
     };
     
     const handleDelete = async (id: string | number, tableName: string) => {
+        if (!window.confirm('هل أنت متأكد أنك تريد حذف هذا العنصر؟')) return;
+        
         const { error } = await supabase.from(tableName).delete().eq('id', id);
 
         if (error) {
-            console.error(`فشل في الحذف: ${error.message}`);
+            setMessage({ type: 'error', text: `فشل في الحذف: ${error.message}` });
         } else {
+             setMessage({ type: 'success', text: 'تم حذف العنصر بنجاح.' });
             fetchData(); // Refresh data
         }
     };
+    
+     const renderTable = () => {
+        let headers: string[] = [];
+        let data: (string | number)[][] = [];
+
+        if (activeTab === 'dormitories') {
+            headers = ['اسم المهجع'];
+            data = paginatedItems.map(d => [d.name]);
+        } else if (activeTab === 'students') {
+            headers = ['اسم الطالب', 'المهجع'];
+            data = (paginatedItems as Student[]).map(s => [s.name, dormitories.find(d => d.id === s.dormitory_id)?.name || 'N/A']);
+        }
+        
+        return (
+             <div className="overflow-x-auto">
+                <table className="w-full text-sm text-right text-slate-600">
+                    <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                        <tr>
+                            {headers.map(h => <th key={h} className="px-2 py-3 sm:px-6 whitespace-nowrap">{h}</th>)}
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.length === 0 ? (
+                            <tr>
+                                <td colSpan={headers.length + 1} className="text-center py-8 text-slate-500">
+                                    لا توجد بيانات متاحة.
+                                </td>
+                            </tr>
+                        ) : (
+                            data.map((row, rowIndex) => (
+                                <tr key={paginatedItems[rowIndex].id} className="bg-white border-b hover:bg-slate-50">
+                                    {row.map((cell, cellIndex) => <td key={cellIndex} className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{cell}</td>)}
+                                    <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                        <div className="flex gap-3 justify-end">
+                                            <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
+                                                <EditIcon className="w-5 h-5" />
+                                            </button>
+                                            <button onClick={() => handleDelete(paginatedItems[rowIndex].id, activeTab)} className="text-red-600 hover:text-red-800">
+                                                <DeleteIcon className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        );
+    }
 
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">إدارة شؤون المهجع</h2>
 
             {message && (
@@ -218,30 +241,29 @@ export const DormitoryView: React.FC = () => {
                 <div className="px-6 pt-4 border-b border-slate-200">
                     <nav className="-mb-px flex gap-6" aria-label="Tabs">
                         <TabButton isActive={activeTab === 'dormitories'} onClick={() => setActiveTab('dormitories')}>
-                            المهاجع الحالية
+                            المهاجع الحالية ({dormitories.length})
                         </TabButton>
                         <TabButton isActive={activeTab === 'students'} onClick={() => setActiveTab('students')}>
-                            الطلاب في المهاجع
+                            الطلاب في المهاجع ({students.length})
                         </TabButton>
                     </nav>
                 </div>
-                <div className="p-4 sm:p-6">
-                    {activeTab === 'dormitories' && (
-                        <DataTable 
-                            headers={['#', 'اسم المهجع']} 
-                            data={dormitories.map((d, i) => [i + 1, d.name])}
-                            onDelete={(id) => handleDelete(id, 'dormitories')}
-                            items={dormitories}
-                        />
-                    )}
-                    {activeTab === 'students' && (
-                         <DataTable 
-                            headers={['#', 'اسم الطالب', 'المهجع']} 
-                            data={students.map((s, i) => [i + 1, s.name, dormitories.find(d => d.id === s.dormitory_id)?.name || 'N/A'])}
-                            onDelete={(id) => handleDelete(id, 'students')}
-                            items={students}
-                        />
-                    )}
+                 <div className="p-2 sm:p-6">
+                    <input 
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                        placeholder={`بحث في ${activeTab}...`}
+                        className="w-full md:w-1/3 p-2 border rounded-md mb-4"
+                    />
+                    {renderTable()}
+                    <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredItems.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                        onItemsPerPageChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+                    />
                 </div>
             </div>
         </div>

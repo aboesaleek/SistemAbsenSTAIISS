@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { DormitoryPermissionType, CeremonyStatus, ceremonyStatusToLabel } from '../../types';
+import { DormitoryPermissionType, CeremonyStatus, ceremonyStatusToLabel, Student } from '../../types';
 import { supabase } from '../../supabaseClient';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
@@ -99,6 +99,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [activeTab, setActiveTab] = useState<'permissions' | 'prayerAbsences' | 'ceremonyAbsences'>('permissions');
     const [isExporting, setIsExporting] = useState(false);
     const recapContentRef = useRef<HTMLDivElement>(null);
+    const [showSearchResults, setShowSearchResults] = useState(false);
 
     const deleteAbsenceRecord = async (id: string, type: 'prayer' | 'ceremony') => {
         const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
@@ -125,6 +126,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         if (student) {
           setSelectedDormitoryId(student.dormitory_id || '');
           setSelectedStudentId(student.id);
+          setSearchQuery(student.name);
         }
       }
     }, [preselectedStudentId, students]);
@@ -171,16 +173,24 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         };
     }, [selectedStudentId, ceremonyAbsences]);
 
-    const filteredStudents = useMemo(() => {
-        let result = students;
-        if (selectedDormitoryId) {
-            result = result.filter(s => s.dormitory_id === selectedDormitoryId);
-        }
-        if (searchQuery) {
-            result = result.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-        }
-        return result;
-    }, [students, selectedDormitoryId, searchQuery]);
+    const allSearchedStudents = useMemo(() => {
+        if (!searchQuery) return [];
+        const selectedStudentName = students.find(s => s.id === selectedStudentId)?.name;
+        if (searchQuery === selectedStudentName) return [];
+        return students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }, [searchQuery, students, selectedStudentId]);
+
+    const studentsInSelectedDormitory = useMemo(() => {
+        if (!selectedDormitoryId) return [];
+        return students.filter(s => s.dormitory_id === selectedDormitoryId);
+    }, [students, selectedDormitoryId]);
+
+    const handleStudentSearchSelect = (student: Student) => {
+        setSearchQuery(student.name);
+        setSelectedDormitoryId(student.dormitory_id || '');
+        setSelectedStudentId(student.id);
+        setShowSearchResults(false);
+    };
 
     const generateReportCanvas = async (): Promise<HTMLCanvasElement | null> => {
         const reportElement = recapContentRef.current;
@@ -354,16 +364,41 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
             
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4 no-print">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input
-                        type="text"
-                        placeholder="بحث باسم الطالب..."
-                        value={searchQuery}
-                        onChange={e => { setSearchQuery(e.target.value); setSelectedStudentId(''); }}
-                        className="w-full p-2 border border-slate-300 rounded-lg"
-                    />
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="بحث باسم الطالب..."
+                            value={searchQuery}
+                            onChange={e => {
+                                setSearchQuery(e.target.value);
+                                setShowSearchResults(true);
+                                setSelectedStudentId('');
+                            }}
+                            onFocus={() => setShowSearchResults(true)}
+                            onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                            className="w-full p-2 border border-slate-300 rounded-lg"
+                        />
+                        {showSearchResults && allSearchedStudents.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-lg">
+                                {allSearchedStudents.slice(0, 10).map(student => (
+                                    <li
+                                        key={student.id}
+                                        className="p-2 hover:bg-purple-100 cursor-pointer text-sm"
+                                        onClick={() => handleStudentSearchSelect(student)}
+                                    >
+                                        {student.name} - <span className="text-xs text-slate-500">{dormitories.find(d => d.id === student.dormitory_id)?.name}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                     <select
                         value={selectedDormitoryId}
-                        onChange={e => { setSelectedDormitoryId(e.target.value); setSelectedStudentId(''); }}
+                        onChange={e => {
+                            setSelectedDormitoryId(e.target.value);
+                            setSelectedStudentId('');
+                            setSearchQuery('');
+                        }}
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
                         <option value="">-- اختر المهجع --</option>
@@ -371,12 +406,20 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                     </select>
                     <select
                         value={selectedStudentId}
-                        onChange={e => setSelectedStudentId(e.target.value)}
-                        disabled={filteredStudents.length === 0}
+                        onChange={e => {
+                            const student = students.find(s => s.id === e.target.value);
+                            setSelectedStudentId(e.target.value);
+                            if (student) {
+                                setSearchQuery(student.name);
+                            } else {
+                                setSearchQuery('');
+                            }
+                        }}
+                        disabled={!selectedDormitoryId}
                         className="w-full p-2 border border-slate-300 rounded-lg bg-white disabled:bg-slate-100"
                     >
                         <option value="">-- اختر الطالب --</option>
-                        {filteredStudents.map(s => (
+                        {studentsInSelectedDormitory.map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </select>
@@ -385,7 +428,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
 
             {selectedStudentId && (
               <div ref={recapContentRef} className="printable-area">
-                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4">
+                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-2 sm:p-4">
                     <h3 className="text-2xl font-bold text-slate-800 mb-4 text-center">{students.find(s=>s.id === selectedStudentId)?.name}</h3>
                     <div className="flex justify-center border-b no-print">
                         <MainTabButton isActive={activeTab === 'permissions'} onClick={() => setActiveTab('permissions')}>ملخص الأذونات</MainTabButton>
@@ -394,7 +437,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                     </div>
 
                     {activeTab === 'permissions' && permissionData && (
-                        <div className="p-4 sm:p-6 space-y-6">
+                        <div className="p-2 sm:p-6 space-y-6">
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="flex flex-col justify-between space-y-4">
                                    <div className="text-center p-6 bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl shadow-xl">
@@ -422,24 +465,24 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
-                                                <th className="px-6 py-3 whitespace-nowrap">#</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">النوع</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">عدد الأيام</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">البيان</th>
-                                                <th className="px-6 py-3 whitespace-nowrap no-print">إجراء</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">#</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">التاريخ</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">النوع</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">عدد الأيام</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">البيان</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap no-print">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
                                             {permissionData.records.length > 0 ? (
                                                 permissionData.records.map((record, index) => (
                                                     <tr key={record.id} className="border-b hover:bg-slate-50">
-                                                        <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
-                                                        <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
-                                                        <td data-label="النوع" className="px-6 py-4 whitespace-nowrap">{record.type}</td>
-                                                        <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.number_of_days}</td>
-                                                        <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
-                                                        <td className="px-6 py-4 action-cell whitespace-nowrap no-print">
+                                                        <td data-label="#" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{index + 1}</td>
+                                                        <td data-label="التاريخ" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">{record.date}</td>
+                                                        <td data-label="النوع" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.type}</td>
+                                                        <td data-label="عدد الأيام" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.number_of_days}</td>
+                                                        <td data-label="البيان" className="px-2 py-3 sm:px-6 sm:py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
+                                                        <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap no-print">
                                                             <button onClick={() => deletePermissionRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
@@ -457,7 +500,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                     )}
                     
                     {activeTab === 'prayerAbsences' && prayerAbsenceData && (
-                        <div className="p-4 sm:p-6 space-y-6">
+                        <div className="p-2 sm:p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="flex flex-col justify-between space-y-4">
                                     <div className="text-center p-6 bg-gradient-to-br from-teal-500 to-cyan-500 text-white rounded-xl shadow-xl">
@@ -483,22 +526,22 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
-                                                <th className="px-6 py-3 whitespace-nowrap">#</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">الصلاة</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
-                                                <th className="px-6 py-3 whitespace-nowrap no-print">إجراء</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">#</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">التاريخ</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الصلاة</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الحالة</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap no-print">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
                                             {prayerAbsenceData.records.length > 0 ? (
                                                 prayerAbsenceData.records.map((record, index) => (
                                                     <tr key={record.id} className="border-b hover:bg-slate-50">
-                                                        <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
-                                                        <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
-                                                        <td data-label="الصلاة" className="px-6 py-4 whitespace-nowrap">{record.prayer}</td>
-                                                        <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
-                                                        <td className="px-6 py-4 action-cell whitespace-nowrap no-print">
+                                                        <td data-label="#" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{index + 1}</td>
+                                                        <td data-label="التاريخ" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">{record.date}</td>
+                                                        <td data-label="الصلاة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.prayer}</td>
+                                                        <td data-label="الحالة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
+                                                        <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap no-print">
                                                             <button onClick={() => deleteAbsenceRecord(record.id, 'prayer')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
@@ -514,7 +557,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                     )}
 
                     {activeTab === 'ceremonyAbsences' && ceremonyAbsenceData && (
-                        <div className="p-4 sm:p-6 space-y-6">
+                        <div className="p-2 sm:p-6 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="flex flex-col justify-between space-y-4">
                                     <div className="text-center p-6 bg-gradient-to-br from-rose-500 to-pink-600 text-white rounded-xl shadow-xl">
@@ -540,20 +583,20 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                     <table className="w-full text-sm text-right text-slate-600 responsive-table">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100 sticky top-0">
                                             <tr>
-                                                <th className="px-6 py-3 whitespace-nowrap">#</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                                                <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
-                                                <th className="px-6 py-3 whitespace-nowrap no-print">إجراء</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">#</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">التاريخ</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الحالة</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap no-print">إجراء</th>
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white">
                                             {ceremonyAbsenceData.records.length > 0 ? (
                                                 ceremonyAbsenceData.records.map((record, index) => (
                                                     <tr key={record.id} className="border-b hover:bg-slate-50">
-                                                        <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
-                                                        <td data-label="التاريخ" className="px-6 py-4 font-semibold whitespace-nowrap">{record.date}</td>
-                                                        <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
-                                                        <td className="px-6 py-4 action-cell whitespace-nowrap no-print">
+                                                        <td data-label="#" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{index + 1}</td>
+                                                        <td data-label="التاريخ" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">{record.date}</td>
+                                                        <td data-label="الحالة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
+                                                        <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap no-print">
                                                             <button onClick={() => deleteAbsenceRecord(record.id, 'ceremony')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>

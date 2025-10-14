@@ -6,18 +6,22 @@ import { DashboardLayout, NavLinkItem } from '../components/layout/DashboardLayo
 import { AcademicIcon } from '../components/icons/AcademicIcon';
 import { DormitoryIcon } from '../components/icons/DormitoryIcon';
 import { UsersIcon } from '../components/icons/UsersIcon';
+import { HomeIcon } from '../components/icons/HomeIcon';
+import { AdminHomeView } from '../components/admin/AdminHomeView';
 
-export type AdminViewType = 'academic' | 'dormitory' | 'users';
+export type AdminViewType = 'home' | 'academic' | 'dormitory' | 'users';
 
 interface AdminDashboardProps {
   onLogout: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
-  const [currentView, setCurrentView] = useState<AdminViewType>('academic');
+  const [currentView, setCurrentView] = useState<AdminViewType>('home');
 
   const renderView = () => {
     switch (currentView) {
+      case 'home':
+        return <AdminHomeView setCurrentView={setCurrentView} />;
       case 'academic':
         return <AcademicView />;
       case 'dormitory':
@@ -25,11 +29,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       case 'users':
         return <UsersView />;
       default:
-        return <AcademicView />;
+        return <AdminHomeView setCurrentView={setCurrentView} />;
     }
   };
   
   const navLinks: NavLinkItem[] = [
+    {
+      id: 'home',
+      label: 'الرئيسية',
+      icon: <HomeIcon className="w-6 h-6" />,
+      isActive: currentView === 'home',
+      onClick: () => setCurrentView('home'),
+    },
     {
       id: 'academic',
       label: 'الأكاديمية',

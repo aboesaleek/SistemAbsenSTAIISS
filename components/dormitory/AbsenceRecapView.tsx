@@ -6,6 +6,7 @@ import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { PrinterIcon } from '../icons/PrinterIcon';
+import { Pagination } from '../shared/Pagination';
 
 // Declare jsPDF and html2canvas from window for TypeScript
 declare global {
@@ -35,6 +36,8 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
     const [endDate, setEndDate] = useState('');
     const recapContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
     const title = type === 'prayer' ? 'ملخص غياب الصلاة' : 'ملخص غياب المراسم';
@@ -55,6 +58,11 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
             return matchesSearch && matchesDormitory && matchesStartDate && matchesEndDate;
         });
     }, [records, searchQuery, selectedDormitoryId, startDate, endDate]);
+
+    const paginatedRecords = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredRecords.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredRecords, currentPage, itemsPerPage]);
 
     const deleteRecord = async (id: string) => {
         const { error } = await supabase.from(tableName).delete().eq('id', id);
@@ -133,72 +141,83 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
     }
 
     return (
-        <div ref={recapContentRef} className="space-y-4 printable-area">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
-                <div className="flex items-center gap-2 no-print">
-                    <button
-                        onClick={handleExportPDF}
-                        disabled={isExporting}
-                        className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
-                    >
-                        <DownloadIcon className="w-5 h-5" />
-                        <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
-                    </button>
-                    <button
-                        onClick={handlePrint}
-                        className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        <PrinterIcon className="w-5 h-5" />
-                        <span>طباعة</span>
-                    </button>
+        <div className="space-y-4">
+            <div ref={recapContentRef} className="printable-area">
+                 <div className="p-2 sm:p-4 rounded-lg bg-white">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                        <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
+                        <div className="flex items-center gap-2 no-print">
+                            <button
+                                onClick={handleExportPDF}
+                                disabled={isExporting}
+                                className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+                            >
+                                <DownloadIcon className="w-5 h-5" />
+                                <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
+                            </button>
+                            <button
+                                onClick={handlePrint}
+                                className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <PrinterIcon className="w-5 h-5" />
+                                <span>طباعة</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-4 no-print">
+                        <input type="text" placeholder="بحث باسم الطالب..." value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }} className="w-full p-2 border border-slate-300 rounded-lg" />
+                        <select value={selectedDormitoryId} onChange={e => { setSelectedDormitoryId(e.target.value); setCurrentPage(1); }} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
+                            <option value="">كل المهاجع</option>
+                            {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                        <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setCurrentPage(1); }} className="w-full p-2 border border-slate-300 rounded-lg" />
+                        <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setCurrentPage(1); }} className="w-full p-2 border border-slate-300 rounded-lg" />
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-right text-slate-600 responsive-table">
+                            <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">#</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">المهجع</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">التاريخ</th>
+                                    {type === 'prayer' && <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الصلاة</th>}
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الحالة</th>
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap no-print">إجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedRecords.map((record, index) => (
+                                    <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
+                                        <td data-label="#" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{((currentPage - 1) * itemsPerPage) + index + 1}</td>
+                                        <td data-label="اسم الطالب" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">
+                                            <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer no-print-link">{record.studentName}</button>
+                                            <span className="print-only-text">{record.studentName}</span>
+                                        </td>
+                                        <td data-label="المهجع" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.dormitoryName}</td>
+                                        <td data-label="التاريخ" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.date}</td>
+                                        {type === 'prayer' && (
+                                            <td data-label="الصلاة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{(record as DormitoryPrayerAbsence).prayer}</td>
+                                        )}
+                                        <td data-label="الحالة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{ceremonyStatusToLabel[type === 'prayer' ? (record as DormitoryPrayerAbsence).status : (record as DormitoryCeremonyAbsence).status]}</td>
+                                        <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap no-print">
+                                            <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {paginatedRecords.length === 0 && <p className="text-center text-slate-500 py-8">لا توجد بيانات تطابق معايير البحث.</p>}
+                    </div>
                 </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
-                <input type="text" placeholder="بحث باسم الطالب..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg" />
-                <select value={selectedDormitoryId} onChange={e => setSelectedDormitoryId(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg bg-white">
-                    <option value="">كل المهاجع</option>
-                    {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg" />
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg" />
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right text-slate-600 responsive-table">
-                    <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                        <tr>
-                            <th className="px-6 py-3 whitespace-nowrap">#</th>
-                            <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
-                            <th className="px-6 py-3 whitespace-nowrap">المهجع</th>
-                            <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                            {type === 'prayer' && <th className="px-6 py-3 whitespace-nowrap">الصلاة</th>}
-                            <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
-                            <th className="px-6 py-3 whitespace-nowrap no-print">إجراء</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredRecords.map((record, index) => (
-                            <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
-                                <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
-                                    <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer no-print-link">{record.studentName}</button>
-                                    <span className="print-only-text">{record.studentName}</span>
-                                </td>
-                                <td data-label="المهجع" className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
-                                <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
-                                {type === 'prayer' && (
-                                    <td data-label="الصلاة" className="px-6 py-4 whitespace-nowrap">{(record as DormitoryPrayerAbsence).prayer}</td>
-                                )}
-                                <td data-label="الحالة" className="px-6 py-4 whitespace-nowrap">{ceremonyStatusToLabel[type === 'prayer' ? (record as DormitoryPrayerAbsence).status : (record as DormitoryCeremonyAbsence).status]}</td>
-                                <td className="px-6 py-4 action-cell whitespace-nowrap no-print">
-                                    <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {filteredRecords.length === 0 && <p className="text-center text-slate-500 py-8">لا توجد بيانات تطابق معايير البحث.</p>}
-            </div>
+             <Pagination
+                currentPage={currentPage}
+                totalItems={filteredRecords.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+            />
         </div>
     );
 }
@@ -213,10 +232,13 @@ export const AbsenceRecapView: React.FC<AbsenceRecapViewProps> = ({ onStudentSel
     return (
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">ملخص الغياب</h2>
-            <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200">
-                <div className="flex justify-center border-b mb-6">
+            <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
+                <div className="flex justify-center border-b mb-6 no-print">
                     <TabButton isActive={activeTab === 'prayer'} onClick={() => setActiveTab('prayer')}>غياب الصلاة</TabButton>
                     <TabButton isActive={activeTab === 'ceremony'} onClick={() => setActiveTab('ceremony')}>غياب المراسم</TabButton>
+                </div>
+                <div className="print-only-text text-center text-2xl font-bold mb-4">
+                  {activeTab === 'prayer' ? 'ملخص غياب الصلاة' : 'ملخص غياب المراسم'}
                 </div>
                 <div>
                     {activeTab === 'prayer' && <GenericAbsenceRecap type="prayer" onStudentSelect={onStudentSelect} />}

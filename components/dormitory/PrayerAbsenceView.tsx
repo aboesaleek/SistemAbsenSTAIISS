@@ -26,16 +26,16 @@ const TodayRecordsTable: React.FC<TodayRecordsTableProps> = ({ records, onStuden
     }
 
     return (
-        <div className="p-4 sm:p-6 bg-slate-50 border border-slate-200 rounded-lg mb-8">
+        <div className="p-2 sm:p-6 bg-slate-50 border border-slate-200 rounded-lg mb-8">
             <h3 className="text-2xl font-bold text-slate-800 mb-4 text-center">بيانات الغياب المسجلة اليوم</h3>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-right text-slate-600">
                     <thead className="text-xs text-slate-700 uppercase bg-slate-200">
                         <tr>
-                            <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
-                            <th className="px-6 py-3 whitespace-nowrap">المهجع</th>
-                            <th className="px-6 py-3 whitespace-nowrap">الصلاة</th>
-                            <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">المهجع</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الصلاة</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الحالة</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
@@ -46,14 +46,14 @@ const TodayRecordsTable: React.FC<TodayRecordsTableProps> = ({ records, onStuden
 
                             return (
                                 <tr key={record.id} className="border-b hover:bg-slate-50">
-                                    <td className="px-6 py-4 font-semibold whitespace-nowrap">
+                                    <td className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">
                                         <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer">
                                             {record.studentName}
                                         </button>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{record.prayer}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.dormitoryName}</td>
+                                    <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.prayer}</td>
+                                    <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusInfo.bg} ${statusInfo.text}`}>
                                             {statusLabel}
                                         </span>
@@ -175,13 +175,13 @@ export const PrayerAbsenceView: React.FC<PrayerAbsenceViewProps> = ({ onStudentS
                                 <div className="overflow-x-auto bg-white rounded-lg border">
                                     <table className="w-full text-sm text-right text-slate-600">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                                            <tr><th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th><th className="px-6 py-3 text-left whitespace-nowrap">حالة الحضور</th></tr>
+                                            <tr><th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th><th className="px-2 py-3 sm:px-6 text-left whitespace-nowrap">حالة الحضور</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
                                             {filteredStudents.map(student => (
                                                 <tr key={student.id} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 font-semibold text-slate-800 whitespace-nowrap">{student.name}</td>
-                                                    <td className="px-6 py-4 text-left whitespace-nowrap">
+                                                    <td className="px-2 py-3 sm:px-6 sm:py-4 font-semibold text-slate-800 whitespace-nowrap">{student.name}</td>
+                                                    <td className="px-2 py-3 sm:px-6 sm:py-4 text-left whitespace-nowrap">
                                                         <div className="flex justify-end gap-2">
                                                             {Object.values(CeremonyStatus).map(status => {
                                                                 const isActive = studentStatuses.get(student.id) === status;

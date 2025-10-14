@@ -26,33 +26,33 @@ const TodayRecordsTable: React.FC<TodayRecordsTableProps> = ({ records, onStuden
     }
 
     return (
-        <div className="p-4 sm:p-6 bg-slate-50 border border-slate-200 rounded-lg mb-8">
+        <div className="p-2 sm:p-6 bg-slate-50 border border-slate-200 rounded-lg mb-8">
             <h3 className="text-2xl font-bold text-slate-800 mb-4 text-center">البيانات المسجلة اليوم</h3>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-right text-slate-600">
                     <thead className="text-xs text-slate-700 uppercase bg-slate-200">
                         <tr>
-                            <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
-                            <th className="px-6 py-3 whitespace-nowrap">الفصل</th>
-                            <th className="px-6 py-3 whitespace-nowrap">الحالة</th>
-                            <th className="px-6 py-3 whitespace-nowrap">المادة الدراسية</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الفصل</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الحالة</th>
+                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">المادة الدراسية</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white">
                         {records.map((record) => (
                             <tr key={record.id} className="border-b hover:bg-slate-50">
-                                <td className="px-6 py-4 font-semibold whitespace-nowrap">
+                                <td className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">
                                     <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-teal-600 hover:underline cursor-pointer">
                                         {record.studentName}
                                     </button>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">{record.className}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.className}</td>
+                                <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
                                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColorMap[record.status]}`}>
                                         {record.status}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">{record.courseName || '-'}</td>
+                                <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.courseName || '-'}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -160,7 +160,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect 
     }
 
     return (
-        <div className="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200">
+        <div className="max-w-4xl mx-auto bg-white p-4 sm:p-8 rounded-2xl shadow-lg border border-slate-200">
             <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">تسجيل الحاضر والغياب</h2>
             
             {submitStatus && (
@@ -227,15 +227,15 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect 
                                     <table className="w-full text-sm text-right text-slate-600">
                                         <thead className="text-xs text-slate-700 uppercase bg-slate-100">
                                             <tr>
-                                                <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
-                                                <th className="px-6 py-3 text-left whitespace-nowrap">تسجيل غياب</th>
+                                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th>
+                                                <th className="px-2 py-3 sm:px-6 text-left whitespace-nowrap">تسجيل غياب</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
                                             {filteredStudents.map(student => (
                                                 <tr key={student.id} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 font-semibold text-slate-800 whitespace-nowrap">{student.name}</td>
-                                                    <td className="px-6 py-4 text-left whitespace-nowrap">
+                                                    <td className="px-2 py-3 sm:px-6 sm:py-4 font-semibold text-slate-800 whitespace-nowrap">{student.name}</td>
+                                                    <td className="px-2 py-3 sm:px-6 sm:py-4 text-left whitespace-nowrap">
                                                         <button
                                                             type="button"
                                                             onClick={() => toggleAbsent(student.id)}

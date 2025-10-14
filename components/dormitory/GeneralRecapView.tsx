@@ -5,6 +5,7 @@ import { PrinterIcon } from '../icons/PrinterIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { DownloadIcon } from '../icons/DownloadIcon';
+import { Pagination } from '../shared/Pagination';
 
 // Declare jsPDF and html2canvas from window for TypeScript
 declare global {
@@ -37,6 +38,8 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const recapContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     const records = useMemo(() => {
         const studentsMap = new Map<string, Student>(students.map(s => [s.id, s]));
@@ -67,6 +70,11 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
             return matchesSearch && matchesDormitory;
         });
     }, [records, searchQuery, selectedDormitoryId]);
+
+    const paginatedRecords = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredRecords.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredRecords, currentPage, itemsPerPage]);
 
     const deleteRecord = async (id: string) => {
         const { error } = await supabase.from('dormitory_permissions').delete().eq('id', id);
@@ -145,81 +153,90 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
     }
     
     return (
-        <div ref={recapContentRef} className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 printable-area">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
-                <div className="no-print flex items-center gap-2">
-                    <button
-                        onClick={handleExportPDF}
-                        disabled={isExporting}
-                        className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+            <div ref={recapContentRef} className="p-2 sm:p-6 printable-area">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
+                    <div className="no-print flex items-center gap-2">
+                        <button
+                            onClick={handleExportPDF}
+                            disabled={isExporting}
+                            className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+                        >
+                            <DownloadIcon className="w-5 h-5" />
+                            <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
+                        </button>
+                        <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                            <PrinterIcon className="w-5 h-5" />
+                            <span>طباعة</span>
+                        </button>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 no-print">
+                    <input
+                        type="text"
+                        placeholder="بحث باسم الطالب..."
+                        value={searchQuery}
+                        onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                        className="w-full p-2 border border-slate-300 rounded-lg"
+                    />
+                    <select
+                        value={selectedDormitoryId}
+                        onChange={e => { setSelectedDormitoryId(e.target.value); setCurrentPage(1); }}
+                        className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                     >
-                        <DownloadIcon className="w-5 h-5" />
-                        <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
-                    </button>
-                    <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                        <PrinterIcon className="w-5 h-5" />
-                        <span>طباعة</span>
-                    </button>
+                        <option value="">كل المهاجع</option>
+                        {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-right text-slate-600 responsive-table">
+                        <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                            <tr>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">#</th>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم الطالب</th>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">المهجع</th>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">التاريخ</th>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">عدد الأيام</th>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">البيان</th>
+                                <th className="px-2 py-3 sm:px-6 no-print whitespace-nowrap">إجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedRecords.map((record, index) => (
+                                <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
+                                    <td data-label="#" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{((currentPage - 1) * itemsPerPage) + index + 1}</td>
+                                    <td data-label="اسم الطالب" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">
+                                         <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer no-print-link">
+                                            {record.studentName}
+                                        </button>
+                                        <span className="print-only-text">{record.studentName}</span>
+                                    </td>
+                                    <td data-label="المهجع" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.dormitoryName}</td>
+                                    <td data-label="التاريخ" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.date}</td>
+                                    <td data-label="عدد الأيام" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.numberOfDays}</td>
+                                    <td data-label="البيان" className="px-2 py-3 sm:px-6 sm:py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
+                                    <td className="px-2 py-3 sm:px-6 sm:py-4 no-print action-cell whitespace-nowrap">
+                                        <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800">
+                                            <DeleteIcon className="w-5 h-5" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                     {paginatedRecords.length === 0 && (
+                        <p className="text-center text-slate-500 py-8">لا توجد بيانات تطابق معايير البحث.</p>
+                    )}
                 </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 no-print">
-                <input
-                    type="text"
-                    placeholder="بحث باسم الطالب..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg"
-                />
-                <select
-                    value={selectedDormitoryId}
-                    onChange={e => setSelectedDormitoryId(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                >
-                    <option value="">كل المهاجع</option>
-                    {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right text-slate-600 responsive-table">
-                    <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                        <tr>
-                            <th className="px-6 py-3 whitespace-nowrap">#</th>
-                            <th className="px-6 py-3 whitespace-nowrap">اسم الطالب</th>
-                            <th className="px-6 py-3 whitespace-nowrap">المهجع</th>
-                            <th className="px-6 py-3 whitespace-nowrap">التاريخ</th>
-                            <th className="px-6 py-3 whitespace-nowrap">عدد الأيام</th>
-                            <th className="px-6 py-3 whitespace-nowrap">البيان</th>
-                            <th className="px-6 py-3 no-print whitespace-nowrap">إجراء</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredRecords.map((record, index) => (
-                            <tr key={record.id} className="bg-white border-b hover:bg-slate-50">
-                                <td data-label="#" className="px-6 py-4 whitespace-nowrap">{index + 1}</td>
-                                <td data-label="اسم الطالب" className="px-6 py-4 font-semibold whitespace-nowrap">
-                                     <button onClick={() => onStudentSelect(record.studentId)} className="text-right w-full hover:text-purple-600 hover:underline cursor-pointer no-print-link">
-                                        {record.studentName}
-                                    </button>
-                                    <span className="print-only-text">{record.studentName}</span>
-                                </td>
-                                <td data-label="المهجع" className="px-6 py-4 whitespace-nowrap">{record.dormitoryName}</td>
-                                <td data-label="التاريخ" className="px-6 py-4 whitespace-nowrap">{record.date}</td>
-                                <td data-label="عدد الأيام" className="px-6 py-4 whitespace-nowrap">{record.numberOfDays}</td>
-                                <td data-label="البيان" className="px-6 py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
-                                <td className="px-6 py-4 no-print action-cell whitespace-nowrap">
-                                    <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800">
-                                        <DeleteIcon className="w-5 h-5" />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                 {filteredRecords.length === 0 && (
-                    <p className="text-center text-slate-500 py-8">لا توجد بيانات تطابق معايير البحث.</p>
-                )}
-            </div>
+            <Pagination
+                currentPage={currentPage}
+                totalItems={filteredRecords.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+            />
         </div>
     );
 };

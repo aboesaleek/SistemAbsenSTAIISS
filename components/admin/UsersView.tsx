@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { User, AppRole } from '../../types';
 import { EditIcon } from '../icons/EditIcon';
 import { DeleteIcon } from '../icons/DeleteIcon';
 import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
+import { Pagination } from '../shared/Pagination';
 
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -13,57 +14,32 @@ const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, c
     </div>
 );
 
-const DataTable: React.FC<{ headers: string[]; data: any[][]; }> = ({ headers, data }) => (
-    <div className="overflow-x-auto">
-        <table className="w-full text-sm text-right text-slate-600 responsive-table">
-            <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                <tr>
-                    {headers.map(h => <th key={h} className="px-6 py-3 whitespace-nowrap">{h}</th>)}
-                    <th className="px-6 py-3 whitespace-nowrap">إجراءات</th>
-                </tr>
-            </thead>
-            <tbody>
-                 {data.length === 0 ? (
-                    <tr>
-                        <td colSpan={headers.length + 1} className="text-center py-8 text-slate-500">
-                            لا يوجد مستخدمون.
-                        </td>
-                    </tr>
-                ) : (
-                    data.map((row, rowIndex) => (
-                        <tr key={rowIndex} className="bg-white border-b hover:bg-slate-50">
-                            {row.map((cell, cellIndex) => <td key={cellIndex} data-label={headers[cellIndex]} className="px-6 py-4 whitespace-nowrap">{cell}</td>)}
-                            <td className="px-6 py-4 action-cell whitespace-nowrap">
-                                <div className="flex gap-3 justify-end">
-                                    <button className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
-                                        <EditIcon className="w-5 h-5" />
-                                    </button>
-                                    <button className="text-red-400 cursor-not-allowed" title="الحذف يتطلب أذونات المسؤول من جانب الخادم">
-                                        <DeleteIcon className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))
-                )}
-            </tbody>
-        </table>
-    </div>
-);
-
 export const UsersView: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+
+    // State for pagination and search
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     const emailRef = useRef<HTMLInputElement>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
     const roleRef = useRef<HTMLSelectElement>(null);
 
+    const paginatedUsers = useMemo(() => {
+        const filtered = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
+        
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filtered.slice(startIndex, startIndex + itemsPerPage);
+    }, [users, searchQuery, currentPage, itemsPerPage]);
+
     async function fetchUsers() {
         setLoading(true);
         try {
-            const { data, error } = await supabase.from('profiles').select('*');
+            const { data, error } = await supabase.from('profiles').select('*').order('username');
             if (error) throw error;
             setUsers(data || []);
         } catch (error: any) {
@@ -79,7 +55,7 @@ export const UsersView: React.FC = () => {
 
     const handleAddUser = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
+        setIsSubmitting(true);
         setMessage(null);
 
         const email = emailRef.current?.value;
@@ -88,19 +64,15 @@ export const UsersView: React.FC = () => {
 
         if (!email || !password || !role) {
             setMessage({ type: 'error', text: "يرجى ملء جميع الحقول." });
-            setLoading(false);
+            setIsSubmitting(false);
             return;
         }
 
-        // Dengan trigger SQL, kita tidak perlu lagi menyisipkan profil secara manual.
-        // Cukup kirim 'role' sebagai metadata, dan trigger akan menanganinya.
         const { error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-                data: {
-                    role: role, // Metadata ini akan dibaca oleh trigger di database
-                },
+                data: { role },
             },
         });
 
@@ -110,38 +82,29 @@ export const UsersView: React.FC = () => {
                 userMessage = "هذا البريد الإلكتروني مسجل بالفعل.";
             } else if (userMessage.includes("Password should be at least 6 characters")) {
                 userMessage = "يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل.";
-            } else if (userMessage.includes("violates row-level security policy for table \"profiles\"")) {
-                // Pesan ini sekarang lebih relevan karena trigger berjalan di server
-                userMessage = "فشل في إنشاء الملف الشخصي: تحقق من أذونات trigger SQL أو سياسات RLS.";
             }
             setMessage({ type: 'error', text: `فشل في إنشاء المستخدم: ${userMessage}` });
-            setLoading(false);
+            setIsSubmitting(false);
             return;
         }
         
-        // Success
         setMessage({ type: 'success', text: "تمت إضافة المستخدم بنجاح! سيظهر في القائمة بعد لحظات." });
         
-        // Beri sedikit waktu agar trigger berjalan sebelum memuat ulang data
-        setTimeout(() => {
-            fetchUsers();
-        }, 1000);
+        setTimeout(() => fetchUsers(), 1000);
 
         if (emailRef.current) emailRef.current.value = '';
         if (passwordRef.current) passwordRef.current.value = '';
 
-        setLoading(false);
+        setIsSubmitting(false);
         setTimeout(() => setMessage(null), 8000);
     };
-
 
     if (loading && users.length === 0) {
         return <div className="text-center p-8">...جاري تحميل المستخدمين</div>;
     }
 
-
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">إدارة المستخدمين</h2>
             
             {message && (
@@ -168,16 +131,63 @@ export const UsersView: React.FC = () => {
                             <option value={AppRole.SUPER_ADMIN}>مسؤول عام (Super Admin)</option>
                         </select>
                     </div>
-                    <button type="submit" disabled={loading} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50">
-                        {loading ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة مستخدم</>}
+                    <button type="submit" disabled={isSubmitting} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50">
+                        {isSubmitting ? '...جاري الإضافة' : <><PlusIcon className="w-5 h-5" /> إضافة مستخدم</>}
                     </button>
                 </form>
             </Card>
 
-            <Card title="قائمة المستخدمين">
-                <DataTable 
-                    headers={['#', 'اسم المستخدم (البريد الإلكتروني)', 'الدور']} 
-                    data={users.map((u, i) => [i + 1, u.username, u.role])} 
+            <Card title={`قائمة المستخدمين (${users.length})`}>
+                 <input 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    placeholder="بحث باسم المستخدم..."
+                    className="w-full md:w-1/3 p-2 border rounded-md mb-4"
+                />
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-right text-slate-600">
+                        <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                            <tr>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">اسم المستخدم (البريد الإلكتروني)</th>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">الدور</th>
+                                <th className="px-2 py-3 sm:px-6 whitespace-nowrap">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                             {paginatedUsers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={3} className="text-center py-8 text-slate-500">
+                                        لا يوجد مستخدمون.
+                                    </td>
+                                </tr>
+                            ) : (
+                                paginatedUsers.map((user) => (
+                                    <tr key={user.id} className="bg-white border-b hover:bg-slate-50">
+                                        <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap font-semibold">{user.username}</td>
+                                        <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{user.role}</td>
+                                        <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                            <div className="flex gap-3 justify-end">
+                                                <button className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
+                                                    <EditIcon className="w-5 h-5" />
+                                                </button>
+                                                <button className="text-red-400 cursor-not-allowed" title="الحذف يتطلب أذونات المسؤول من جانب الخادم">
+                                                    <DeleteIcon className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                 <Pagination
+                    currentPage={currentPage}
+                    totalItems={users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase())).length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                    onItemsPerPageChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
                 />
             </Card>
         </div>

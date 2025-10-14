@@ -48,7 +48,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navL
           </button>
         </header>
         
-        <main className="flex-1 p-4 sm:p-6 md:p-8">
+        <main className="flex-1 p-3 sm:p-6">
           {children}
         </main>
       </div>
