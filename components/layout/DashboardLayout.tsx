@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { MenuIcon } from '../icons/MenuIcon';
 import { Logo } from '../icons/Logo';
+import { useBackground } from '../../contexts/BackgroundContext';
 
 export interface NavLinkItem {
   id: string;
@@ -18,37 +19,18 @@ interface DashboardLayoutProps {
   dashboardTitle: string;
 }
 
-// A curated list of high-quality, Islamic-themed backgrounds from Pexels.
-const ISLAMIC_BACKGROUNDS = [
-  "https://images.pexels.com/photos/4139818/pexels-photo-4139818.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Nabawi Mosque
-  "https://images.pexels.com/photos/8643936/pexels-photo-8643936.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Interior Blue Mosque
-  "https://images.pexels.com/photos/4038863/pexels-photo-4038863.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Sheikh Zayed Grand Mosque
-  "https://images.pexels.com/photos/1359325/pexels-photo-1359325.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Person praying in mosque
-  "https://images.pexels.com/photos/5095753/pexels-photo-5095753.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Mosque silhouette sunset
-  "https://images.pexels.com/photos/8038520/pexels-photo-8038520.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Ornate mosque interior
-  "https://images.pexels.com/photos/7437593/pexels-photo-7437593.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Kaaba
-  "https://images.pexels.com/photos/4607198/pexels-photo-4607198.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Person reading Quran
-  "https://images.pexels.com/photos/1317712/pexels-photo-1317712.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Mosque exterior at night
-  "https://images.pexels.com/photos/7281983/pexels-photo-7281983.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2", // Islamic architecture detail
-];
-
-// Select a new background image deterministically based on the day of the year.
-const now = new Date();
-const startOfYear = new Date(now.getFullYear(), 0, 0);
-const diff = now.getTime() - startOfYear.getTime();
-const oneDay = 1000 * 60 * 60 * 24;
-const dayOfYear = Math.floor(diff / oneDay);
-const backgroundUrl = ISLAMIC_BACKGROUNDS[dayOfYear % ISLAMIC_BACKGROUNDS.length];
-
-
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, navLinks, onLogout, dashboardTitle }) => {
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+  const { backgroundUrl, loading: backgroundLoading } = useBackground();
 
   return (
     <div
       className="min-h-screen bg-cover bg-center bg-fixed"
-      style={{ backgroundImage: `url('${backgroundUrl}')` }}
+      style={{
+        backgroundImage: backgroundLoading ? 'none' : `url('${backgroundUrl}')`,
+        backgroundColor: backgroundLoading ? '#f1f5f9' : 'transparent'
+      }}
       dir="rtl"
     >
       <div className="absolute inset-0 bg-slate-100/90 backdrop-blur-sm z-0" />

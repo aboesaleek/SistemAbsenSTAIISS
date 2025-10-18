@@ -8,8 +8,10 @@ import { DormitoryIcon } from '../components/icons/DormitoryIcon';
 import { UsersIcon } from '../components/icons/UsersIcon';
 import { HomeIcon } from '../components/icons/HomeIcon';
 import { AdminHomeView } from '../components/admin/AdminHomeView';
+import { SettingsView } from '../components/admin/SettingsView';
+import { SettingsIcon } from '../components/icons/SettingsIcon';
 
-export type AdminViewType = 'home' | 'academic' | 'dormitory' | 'users';
+export type AdminViewType = 'home' | 'academic' | 'dormitory' | 'users' | 'settings';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -28,6 +30,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         return <DormitoryView />;
       case 'users':
         return <UsersView />;
+      case 'settings':
+        return <SettingsView />;
       default:
         return <AdminHomeView setCurrentView={setCurrentView} />;
     }
@@ -61,6 +65,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       icon: <UsersIcon className="w-6 h-6" />,
       isActive: currentView === 'users',
       onClick: () => setCurrentView('users'),
+    },
+    {
+      id: 'settings',
+      label: 'الإعدادات',
+      icon: <SettingsIcon className="w-6 h-6" />,
+      isActive: currentView === 'settings',
+      onClick: () => setCurrentView('settings'),
     },
   ];
 

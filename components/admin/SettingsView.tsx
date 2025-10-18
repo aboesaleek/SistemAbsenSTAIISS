@@ -26,22 +26,19 @@ export const SettingsView: React.FC = () => {
     useEffect(() => {
         const fetchCurrentBackground = async () => {
             setLoading(true);
+            const supabaseUrl = 'https://hzfzmoddonrwdlqxdwxs.supabase.co';
+            const customBackgroundUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET_NAME}/${FILE_NAME}`;
+            
             try {
-                const { data, error } = await supabase
-                    .from('app_settings')
-                    .select('value')
-                    .eq('key', LOGIN_BACKGROUND_KEY)
-                    .single();
-                
-                if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found, which is fine
-                    throw error;
-                }
-                
-                if (data?.value) {
-                    // Add a timestamp to bust cache
-                    const url = `${data.value}?t=${new Date().getTime()}`;
-                    setCurrentBackgroundUrl(url);
-                    setPreviewUrl(url);
+                const urlWithCacheBust = `${customBackgroundUrl}?t=${new Date().getTime()}`;
+                const response = await fetch(urlWithCacheBust, { method: 'HEAD' });
+
+                if (response.ok) {
+                    setCurrentBackgroundUrl(urlWithCacheBust);
+                    setPreviewUrl(urlWithCacheBust);
+                } else {
+                    setCurrentBackgroundUrl('');
+                    setPreviewUrl('');
                 }
             } catch (error: any) {
                 setMessage({ type: 'error', text: `فشل في جلب الخلفية الحالية: ${error.message}` });

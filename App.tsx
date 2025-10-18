@@ -11,28 +11,21 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
+    // Function to check the session on initial load
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-    const setAppModeFromSession = async (session: any) => {
-      if (!isMounted) return;
-      
-      if (session?.user) {
-        try {
+        if (session?.user) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('role')
             .eq('id', session.user.id)
             .single();
 
-          if (profileError) {
-              console.error("Gagal mengambil profil (kemungkinan masalah RLS):", profileError.message);
-              throw profileError;
-          }
-
-          if (!profile) {
-            throw new Error("Profil pengguna tidak ditemukan. Keluar.");
-          }
-
+          if (profileError) throw profileError;
+          if (!profile) throw new Error("Profil pengguna tidak ditemukan.");
+          
           const lastMode = sessionStorage.getItem('appMode') as AppMode;
           const userRole = profile.role as AppRole;
           let finalMode: AppMode | null = null;
@@ -54,44 +47,32 @@ function App() {
               }
               if (finalMode) sessionStorage.setItem('appMode', finalMode);
           }
-          if (isMounted) setLoggedInRole(finalMode);
-
-        } catch (error: any) {
-          console.error("Terjadi kesalahan saat memeriksa sesi, keluar:", error.message);
-          await supabase.auth.signOut();
-          if (isMounted) {
-            setLoggedInRole(null);
-            sessionStorage.removeItem('appMode');
-          }
+          setLoggedInRole(finalMode);
+        } else {
+          setLoggedInRole(null);
+          sessionStorage.removeItem('appMode');
         }
-      } else {
-        if (isMounted) {
-            setLoggedInRole(null);
-            sessionStorage.removeItem('appMode');
-        }
+      } catch (error: any) {
+        console.error("Gagal memverifikasi sesi, keluar:", error.message);
+        setLoggedInRole(null);
+        sessionStorage.removeItem('appMode');
+      } finally {
+        // This is critical: ensure loading is set to false after the initial check.
+        setLoading(false);
       }
     };
 
-    // Check initial session state quickly, then remove loader.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        setAppModeFromSession(session).finally(() => {
-            if(isMounted) {
-                setLoading(false);
-            }
-        });
+    checkSession();
+
+    // Listen for auth state changes (e.g., logout from another tab)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setLoggedInRole(null);
+        sessionStorage.removeItem('appMode');
+      }
     });
 
-    // Listen for subsequent auth state changes (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (isMounted) {
-            await setAppModeFromSession(session);
-        }
-      }
-    );
-
     return () => {
-      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
