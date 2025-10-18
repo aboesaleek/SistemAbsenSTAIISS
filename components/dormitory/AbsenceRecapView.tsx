@@ -7,12 +7,16 @@ import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { Pagination } from '../shared/Pagination';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { GoogleGenAI } from '@google/genai';
 
-// Declare jsPDF and html2canvas from window for TypeScript
+
+// Declare jsPDF, html2canvas, and markdownit from window for TypeScript
 declare global {
   interface Window {
     jspdf: any;
     html2canvas: any;
+    markdownit: any;
   }
 }
 
@@ -38,6 +42,9 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
     const [isExporting, setIsExporting] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [aiAnalysis, setAiAnalysis] = useState('');
+    const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(false);
+    const [analysisError, setAnalysisError] = useState('');
 
     const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
     const title = type === 'prayer' ? 'ملخص غياب الصلاة' : 'ملخص غياب المراسم';
@@ -136,17 +143,81 @@ const GenericAbsenceRecap: React.FC<GenericRecapProps> = ({ type, onStudentSelec
         }
     };
 
+    const handleGenerateAnalysis = async () => {
+        if (filteredRecords.length === 0) {
+            setAnalysisError('لا توجد بيانات للتحليل. يرجى ضبط الفلاتر.');
+            return;
+        }
+        setIsGeneratingAnalysis(true);
+        setAiAnalysis('');
+        setAnalysisError('');
+    
+        try {
+            const summaryForPrompt = filteredRecords.reduce((acc, record) => {
+                acc.dormCounts[record.dormitoryName] = (acc.dormCounts[record.dormitoryName] || 0) + 1;
+                const dayOfWeek = new Date(record.date).toLocaleDateString('ar-SA', { weekday: 'long' });
+                acc.dayCounts[dayOfWeek] = (acc.dayCounts[dayOfWeek] || 0) + 1;
+                return acc;
+            }, { dormCounts: {} as Record<string, number>, dayCounts: {} as Record<string, number> });
+    
+            const absenceType = type === 'prayer' ? 'الصلاة' : 'المراسم';
+            const promptData = `
+            بيانات الغياب عن ${absenceType}:
+            - إجمالي سجلات الغياب: ${filteredRecords.length}
+            - الغياب حسب المهجع: ${JSON.stringify(summaryForPrompt.dormCounts)}
+            - الغياب حسب اليوم: ${JSON.stringify(summaryForPrompt.dayCounts)}
+            `;
+    
+            const prompt = `حلل بيانات الغياب عن ${absenceType} التالية. حدد المهجع الذي لديه أعلى معدل غياب، وأي يوم من أيام الأسبوع يحدث فيه أكبر عدد من الغيابات، وما إذا كانت هناك أي اتجاهات أو أنماط غير عادية. قدم النتائج في شكل نقاط موجزة باللغة العربية.
+            ${promptData}`;
+    
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+            });
+            
+            const md = window.markdownit();
+            setAiAnalysis(md.render(response.text));
+    
+        } catch (error) {
+            console.error("Error generating AI analysis:", error);
+            setAnalysisError('فشل إنشاء التحليل. يرجى المحاولة مرة أخرى.');
+        } finally {
+            setIsGeneratingAnalysis(false);
+        }
+    };
+
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
     }
 
     return (
         <div className="space-y-4">
+             {(isGeneratingAnalysis || aiAnalysis || analysisError) && (
+                <div className="bg-teal-50 border-l-4 border-teal-400 p-4 rounded-r-lg">
+                    <h4 className="flex items-center gap-2 text-lg font-bold text-teal-800 mb-2">
+                        <SparklesIcon className="w-6 h-6" />
+                        تحليل الاتجاه بالذكاء الاصطناعي
+                    </h4>
+                    {isGeneratingAnalysis && <p className="text-teal-700">جاري تحليل البيانات، يرجى الانتظار...</p>}
+                    {analysisError && <p className="text-red-600">{analysisError}</p>}
+                    {aiAnalysis && <div className="prose prose-sm text-teal-800" dangerouslySetInnerHTML={{ __html: aiAnalysis }} />}
+                </div>
+            )}
             <div ref={recapContentRef} className="printable-area">
                  <div className="p-2 sm:p-4 rounded-lg bg-white">
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                         <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
-                        <div className="flex items-center gap-2 no-print">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 no-print w-full sm:w-auto">
+                             <button
+                                onClick={handleGenerateAnalysis}
+                                disabled={isGeneratingAnalysis}
+                                className="flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50"
+                                >
+                                <SparklesIcon className="w-5 h-5" />
+                                <span>{isGeneratingAnalysis ? '...جاري التحليل' : 'تحليل الاتجاه الذكي'}</span>
+                            </button>
                             <button
                                 onClick={handleExportPDF}
                                 disabled={isExporting}

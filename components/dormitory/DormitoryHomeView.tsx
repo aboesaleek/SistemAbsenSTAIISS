@@ -1,17 +1,101 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 // FIX: DormitoryPermissionType is exported from types.ts, not DormitoryDashboard.tsx.
 import { DormitoryViewType } from '../../pages/DormitoryDashboard';
-import { DormitoryPermissionType } from '../../types';
+import { DormitoryPermission, DormitoryPermissionType } from '../../types';
 import { DocumentReportIcon } from '../icons/DocumentReportIcon';
 import { UserCircleIcon } from '../icons/UserCircleIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 import { ClipboardListIcon } from '../icons/ClipboardListIcon';
 import { ClipboardCheckIcon } from '../icons/ClipboardCheckIcon';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
-import { TrendingUpIcon } from '../icons/TrendingUpIcon';
-import { MoonIcon } from '../icons/MoonIcon';
-import { MedicalIcon } from '../icons/MedicalIcon';
-import { PermissionIcon } from '../icons/PermissionIcon';
+import { ChartCard } from '../shared/ChartCard';
+
+declare const Chart: any; // Mendeklarasikan Chart dari global scope untuk TypeScript
+
+const MonthlyPermissionChart: React.FC<{ records: DormitoryPermission[] }> = ({ records }) => {
+    const chartRef = useRef<HTMLCanvasElement>(null);
+    const chartInstanceRef = useRef<any>(null);
+
+    const chartData = useMemo(() => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        const monthlyRecords = records.filter(r => {
+            const recordDate = new Date(r.date);
+            return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+        });
+
+        const counts = {
+            [DormitoryPermissionType.SICK_LEAVE]: 0,
+            [DormitoryPermissionType.GROUP_LEAVE]: 0,
+            [DormitoryPermissionType.GENERAL_LEAVE]: 0,
+            [DormitoryPermissionType.OVERNIGHT_LEAVE]: 0,
+        };
+
+        monthlyRecords.forEach(r => {
+            if (counts[r.type as DormitoryPermissionType] !== undefined) {
+                counts[r.type as DormitoryPermissionType]++;
+            }
+        });
+
+        return {
+            labels: Object.values(DormitoryPermissionType),
+            data: Object.values(counts),
+        };
+    }, [records]);
+
+    useEffect(() => {
+        if (chartRef.current) {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+            }
+
+            const ctx = chartRef.current.getContext('2d');
+            if (ctx) {
+                chartInstanceRef.current = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{
+                            label: 'عدد الأذونات',
+                            data: chartData.data,
+                            backgroundColor: [
+                                'rgba(234, 179, 8, 0.7)',  // SICK_LEAVE
+                                'rgba(59, 130, 246, 0.7)', // GROUP_LEAVE
+                                'rgba(16, 185, 129, 0.7)',// GENERAL_LEAVE
+                                'rgba(107, 114, 128, 0.7)'// OVERNIGHT_LEAVE
+                            ],
+                            borderColor: [
+                                'rgba(234, 179, 8, 1)',
+                                'rgba(59, 130, 246, 1)',
+                                'rgba(16, 185, 129, 1)',
+                                'rgba(107, 114, 128, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: { display: false },
+                            legend: { position: 'top', labels: { font: { family: 'Cairo' } } },
+                        },
+                    }
+                });
+            }
+        }
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+            }
+        };
+    }, [chartData]);
+    
+    return <canvas ref={chartRef}></canvas>;
+};
+
 
 interface DormitoryHomeViewProps {
   navigateTo: (view: DormitoryViewType) => void;
@@ -63,54 +147,16 @@ const ReportCard: React.FC<{
     </button>
 )
 
-const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; }> = ({ title, value, icon }) => (
-    <div className="bg-white p-3 sm:p-4 rounded-xl shadow-md border border-slate-200 flex items-center gap-3 sm:gap-4">
-        <div className="flex-shrink-0 bg-slate-100 rounded-full p-2 sm:p-3">
-            {icon}
-        </div>
-        <div>
-            <p className="text-slate-500 text-xs sm:text-sm font-semibold">{title}</p>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-800">{value}</p>
-        </div>
-    </div>
-);
-
 export const DormitoryHomeView: React.FC<DormitoryHomeViewProps> = ({ navigateTo }) => {
-  const { permissionRecords, prayerAbsences, ceremonyAbsences, loading } = useDormitoryData();
-
-  const todayStats = useMemo(() => {
-    if (loading) return { permissions: 0, sick: 0, overnight: 0, absences: 0 };
-    
-    const today = new Date().toISOString().split('T')[0];
-    
-    const todayPermissions = permissionRecords.filter(r => r.date === today);
-    const todayPrayerAbsences = prayerAbsences.filter(r => r.date === today);
-    const todayCeremonyAbsences = ceremonyAbsences.filter(r => r.date === today);
-
-    return {
-      permissions: todayPermissions.filter(r => r.type === DormitoryPermissionType.GENERAL_LEAVE || r.type === DormitoryPermissionType.GROUP_LEAVE).length,
-      sick: todayPermissions.filter(r => r.type === DormitoryPermissionType.SICK_LEAVE).length,
-      overnight: todayPermissions.filter(r => r.type === DormitoryPermissionType.OVERNIGHT_LEAVE).length,
-      absences: todayPrayerAbsences.length + todayCeremonyAbsences.length
-    };
-  }, [permissionRecords, prayerAbsences, ceremonyAbsences, loading]);
+  const { permissionRecords, loading } = useDormitoryData();
 
   return (
     <div className="space-y-8">
-        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
-          <div className="flex items-center gap-3 mb-4">
-              <TrendingUpIcon className="w-6 h-6 text-slate-600" />
-              <h3 className="text-xl font-bold text-slate-700">إحصائيات اليوم</h3>
-          </div>
-          {loading ? <div className="text-center py-4 text-slate-500">...جاري تحميل الإحصائيات</div> : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <StatCard title="إذن خروج" value={todayStats.permissions} icon={<PermissionIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />} />
-              <StatCard title="إذن مرض" value={todayStats.sick} icon={<MedicalIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />} />
-              <StatCard title="إذن مبيت" value={todayStats.overnight} icon={<MoonIcon className="w-5 h-5 sm:w-6 sm:h-6 text-slate-700" />} />
-              <StatCard title="مجموع الغياب" value={todayStats.absences} icon={<ClipboardListIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />} />
-          </div>
-          )}
-      </div>
+      {!loading && (
+        <ChartCard title={`رسم بياني لأذونات شهر ${new Date().toLocaleString('ar-SA', { month: 'long' })}`}>
+            <MonthlyPermissionChart records={permissionRecords} />
+        </ChartCard>
+      )}
 
       <div>
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2 text-center">الوحدات الرئيسية</h2>

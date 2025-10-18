@@ -1,14 +1,17 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { RecapStatus, StudentRecapData } from '../../types';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { DownloadIcon } from '../icons/DownloadIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { GoogleGenAI } from '@google/genai';
 
-// Declare jsPDF and html2canvas from window for TypeScript
+// Declare jsPDF, html2canvas, and markdownit from window for TypeScript
 declare global {
   interface Window {
     jspdf: any;
     html2canvas: any;
+    markdownit: any;
   }
 }
 
@@ -21,6 +24,14 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
     const [selectedClassId, setSelectedClassId] = useState('');
     const [isExporting, setIsExporting] = useState(false);
     const recapContentRef = useRef<HTMLDivElement>(null);
+    const [aiAnalysis, setAiAnalysis] = useState('');
+    const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(false);
+    const [analysisError, setAnalysisError] = useState('');
+
+    useEffect(() => {
+        setAiAnalysis('');
+        setAnalysisError('');
+    }, [selectedClassId]);
     
     const classRecapData = useMemo((): StudentRecapData[] => {
         if (!selectedClassId) return [];
@@ -56,8 +67,60 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
         return Array.from(studentDataMap.values()).sort((a,b) => a.studentName.localeCompare(b.studentName));
     }, [selectedClassId, allRecords]);
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = async () => {
+        const className = classes.find(c => c.id === selectedClassId)?.name;
+        if (!recapContentRef.current || !className) {
+            console.error("Ref atau nama kelas hilang untuk dicetak.");
+            return;
+        }
+
+        setIsExporting(true);
+        try {
+            const canvas = await window.html2canvas(recapContentRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert("Harap izinkan popup untuk situs ini untuk mencetak.");
+                setIsExporting(false);
+                return;
+            }
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Cetak Laporan Kelas ${className}</title>
+                    <style>
+                        @page { size: landscape; margin: 0; }
+                        body { margin: 0; }
+                        img { width: 100%; height: 100%; object-fit: contain; }
+                    </style>
+                </head>
+                <body>
+                    <img src="${imgData}" />
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            
+            printWindow.onload = () => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+            };
+
+        } catch (error) {
+            console.error("Terjadi kesalahan saat mempersiapkan pencetakan:", error);
+            alert("Terjadi kesalahan saat mempersiapkan pencetakan. Silakan coba lagi.");
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const handleExportPDF = async () => {
@@ -114,6 +177,50 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
             setIsExporting(false);
         }
     };
+
+    const handleGenerateAnalysis = async () => {
+        if (!selectedClassId || classRecapData.length === 0) {
+            setAnalysisError('يرجى اختيار فصل دراسي يحتوي على بيانات للتحليل.');
+            return;
+        }
+        setIsGeneratingAnalysis(true);
+        setAiAnalysis('');
+        setAnalysisError('');
+    
+        try {
+            const className = classes.find(c => c.id === selectedClassId)?.name || 'فصل غير معروف';
+            
+            const studentsSummary = classRecapData.map(student => 
+                `- ${student.studentName}: غياب ${student.absentCount}, إذن ${student.permissionCount}, مرض ${student.sickCount}`
+            ).join('\n');
+            
+            const prompt = `أنت مساعد إداري في مؤسسة تعليمية. قم بتحليل بيانات الحضور والغياب التالية لفصل "${className}":
+${studentsSummary}
+
+بناءً على هذه البيانات، قم بما يلي باللغة العربية:
+1.  قدم ملخصًا عامًا لأداء الفصل من حيث الحضور.
+2.  حدد الطلاب الذين لديهم أعلى عدد من الغيابات (أذكر أفضل 3 إن وجدوا).
+3.  هل هناك أي أنماط أو ملاحظات مهمة أخرى؟ (على سبيل المثال، عدد كبير من الأذونات المرضية قد يشير إلى مشكلة صحية).
+4.  قدم توصية موجزة للإدارة.
+
+اجعل التحليل موجزًا وفي شكل نقاط.`;
+    
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+            });
+            
+            const md = window.markdownit();
+            setAiAnalysis(md.render(response.text));
+    
+        } catch (error) {
+            console.error("Error generating AI analysis:", error);
+            setAnalysisError('فشل إنشاء التحليل. يرجى المحاولة مرة أخرى.');
+        } finally {
+            setIsGeneratingAnalysis(false);
+        }
+    };
     
     if (loading && !selectedClassId) {
        return (
@@ -145,10 +252,18 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                         </select>
                     </div>
                     {selectedClassId && (
-                         <div className="flex items-center gap-2">
+                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                            <button
+                              onClick={handleGenerateAnalysis}
+                              disabled={isGeneratingAnalysis || isExporting}
+                              className="flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50"
+                            >
+                                <SparklesIcon className="w-5 h-5" />
+                                <span>{isGeneratingAnalysis ? '...جاري التحليل' : 'تحليل ذكي للفصل'}</span>
+                            </button>
                             <button
                                 onClick={handleExportPDF}
-                                disabled={isExporting}
+                                disabled={isGeneratingAnalysis || isExporting}
                                 className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
                             >
                                 <DownloadIcon className="w-5 h-5" />
@@ -156,15 +271,28 @@ export const ClassRecapView: React.FC<ClassRecapViewProps> = ({ onStudentSelect 
                             </button>
                              <button
                                 onClick={handlePrint}
-                                className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                                disabled={isExporting || isGeneratingAnalysis}
+                                className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                             >
                                 <PrinterIcon className="w-5 h-5" />
-                                <span>طباعة</span>
+                                <span>{isExporting ? '...جاري الطباعة' : 'طباعة'}</span>
                             </button>
                         </div>
                     )}
                 </div>
             </div>
+
+            {(isGeneratingAnalysis || aiAnalysis || analysisError) && (
+                <div className="bg-teal-50 border-l-4 border-teal-400 p-4 rounded-r-lg my-4 no-print">
+                    <h4 className="flex items-center gap-2 text-lg font-bold text-teal-800 mb-2">
+                        <SparklesIcon className="w-6 h-6" />
+                        تحليل ذكي للفصل
+                    </h4>
+                    {isGeneratingAnalysis && <p className="text-teal-700">جاري تحليل بيانات الفصل، يرجى الانتظار...</p>}
+                    {analysisError && <p className="text-red-600">{analysisError}</p>}
+                    {aiAnalysis && <div className="prose prose-sm text-teal-800" dangerouslySetInnerHTML={{ __html: aiAnalysis }} />}
+                </div>
+            )}
 
             {selectedClassId && (
                 <div ref={recapContentRef} className="printable-area bg-white p-2 sm:p-6 rounded-2xl shadow-lg border border-slate-200">

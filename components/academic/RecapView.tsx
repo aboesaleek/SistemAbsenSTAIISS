@@ -5,11 +5,14 @@ import { DownloadIcon } from '../icons/DownloadIcon';
 import { supabase } from '../../supabaseClient';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { Pagination } from '../shared/Pagination';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { GoogleGenAI } from '@google/genai';
 
-// Declare XLSX from window for TypeScript
+// Declare XLSX and markdownit from window for TypeScript
 declare global {
   interface Window {
     XLSX: any;
+    markdownit: any;
   }
 }
 
@@ -37,6 +40,9 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
     const [endDate, setEndDate] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [aiAnalysis, setAiAnalysis] = useState('');
+    const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(false);
+    const [analysisError, setAnalysisError] = useState('');
 
     // Transform records from context to include sourceId and sourceType for deletion
     const combinedRecords = useMemo((): CombinedRecord[] => {
@@ -109,6 +115,51 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
         const today = new Date().toISOString().split('T')[0];
         window.XLSX.writeFile(wb, `تقرير-الغياب-العام-${today}.xlsx`);
     };
+
+    const handleGenerateAnalysis = async () => {
+        if (filteredRecords.length === 0) {
+            setAnalysisError('لا توجد بيانات للتحليل. يرجى ضبط الفلاتر.');
+            return;
+        }
+        setIsGeneratingAnalysis(true);
+        setAiAnalysis('');
+        setAnalysisError('');
+
+        try {
+            const summaryForPrompt = filteredRecords.reduce((acc, record) => {
+                if (record.status !== RecapStatus.ABSENT) return acc;
+                acc.classCounts[record.className] = (acc.classCounts[record.className] || 0) + 1;
+                const dayOfWeek = new Date(record.date).toLocaleDateString('ar-SA', { weekday: 'long' });
+                acc.dayCounts[dayOfWeek] = (acc.dayCounts[dayOfWeek] || 0) + 1;
+                return acc;
+            }, { classCounts: {} as Record<string, number>, dayCounts: {} as Record<string, number> });
+
+            const promptData = `
+            بيانات الغياب:
+            - إجمالي سجلات الغياب: ${filteredRecords.filter(r => r.status === RecapStatus.ABSENT).length}
+            - الغياب حسب الفصل: ${JSON.stringify(summaryForPrompt.classCounts)}
+            - الغياب حسب اليوم: ${JSON.stringify(summaryForPrompt.dayCounts)}
+            `;
+
+            const prompt = `حلل بيانات الغياب الأكاديمية التالية. حدد الفصل الذي لديه أعلى معدل غياب، وأي يوم من أيام الأسبوع يحدث فيه أكبر عدد من الغيابات، وما إذا كانت هناك أي اتجاهات أو أنماط غير عادية. قدم النتائج في شكل نقاط موجزة باللغة العربية.
+            ${promptData}`;
+
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+            });
+            
+            const md = window.markdownit();
+            setAiAnalysis(md.render(response.text));
+
+        } catch (error) {
+            console.error("Error generating AI analysis:", error);
+            setAnalysisError('فشل إنشاء التحليل. يرجى المحاولة مرة أخرى.');
+        } finally {
+            setIsGeneratingAnalysis(false);
+        }
+    };
     
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
@@ -148,14 +199,36 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
                         className="w-full p-2 border border-slate-300 rounded-lg"
                     />
                 </div>
-                <button
-                  onClick={handleExportXLSX}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
-                >
-                    <DownloadIcon className="w-5 h-5" />
-                    <span>تصدير إلى XLSX</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleExportXLSX}
+                      className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <DownloadIcon className="w-5 h-5" />
+                        <span>تصدير إلى XLSX</span>
+                    </button>
+                    <button
+                      onClick={handleGenerateAnalysis}
+                      disabled={isGeneratingAnalysis}
+                      className="flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50"
+                    >
+                        <SparklesIcon className="w-5 h-5" />
+                        <span>{isGeneratingAnalysis ? '...جاري التحليل' : 'تحليل الاتجاه الذكي'}</span>
+                    </button>
+                </div>
             </div>
+
+            {(isGeneratingAnalysis || aiAnalysis || analysisError) && (
+                <div className="bg-teal-50 border-l-4 border-teal-400 p-4 rounded-r-lg">
+                    <h4 className="flex items-center gap-2 text-lg font-bold text-teal-800 mb-2">
+                        <SparklesIcon className="w-6 h-6" />
+                        تحليل الاتجاه بالذكاء الاصطناعي
+                    </h4>
+                    {isGeneratingAnalysis && <p className="text-teal-700">جاري تحليل البيانات، يرجى الانتظار...</p>}
+                    {analysisError && <p className="text-red-600">{analysisError}</p>}
+                    {aiAnalysis && <div className="prose prose-sm text-teal-800" dangerouslySetInnerHTML={{ __html: aiAnalysis }} />}
+                </div>
+            )}
 
             <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
                  <div className="p-2 sm:p-6">

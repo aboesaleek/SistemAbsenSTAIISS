@@ -5,12 +5,15 @@ import { DeleteIcon } from '../icons/DeleteIcon';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { GoogleGenAI } from '@google/genai';
 
-// Declare jsPDF and html2canvas from window for TypeScript
+// Declare jsPDF, html2canvas, and markdownit from window for TypeScript
 declare global {
   interface Window {
     jspdf: any;
     html2canvas: any;
+    markdownit: any;
   }
 }
 
@@ -100,6 +103,9 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [isExporting, setIsExporting] = useState(false);
     const recapContentRef = useRef<HTMLDivElement>(null);
     const [showSearchResults, setShowSearchResults] = useState(false);
+    const [aiSummary, setAiSummary] = useState('');
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [summaryError, setSummaryError] = useState('');
 
     const deleteAbsenceRecord = async (id: string, type: 'prayer' | 'ceremony') => {
         const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
@@ -130,6 +136,11 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         }
       }
     }, [preselectedStudentId, students]);
+
+    useEffect(() => {
+        setAiSummary('');
+        setSummaryError('');
+    }, [selectedStudentId]);
 
     const permissionData = useMemo(() => {
         if (!selectedStudentId) return null;
@@ -331,6 +342,37 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         }
     };
 
+    const handleGenerateSummary = async () => {
+        if (!permissionData || !prayerAbsenceData || !ceremonyAbsenceData || !selectedStudentId) return;
+        setIsGeneratingSummary(true);
+        setAiSummary('');
+        setSummaryError('');
+
+        try {
+            const studentName = students.find(s => s.id === selectedStudentId)?.name;
+            const prompt = `فيما يلي ملخص بيانات طالب المهجع المسمى ${studentName} خلال فترة واحدة:
+- إجمالي الأذونات: ${permissionData.total} (مرض: ${permissionData.sickCount}، جماعي: ${permissionData.groupCount}، عام: ${permissionData.generalCount}، مبيت: ${permissionData.overnightCount}).
+- إجمالي الغياب عن الصلاة: ${prayerAbsenceData.total} (بدون عذر: ${prayerAbsenceData.totalAlpha}، بإذن: ${prayerAbsenceData.totalIzin}، مرض: ${prayerAbsenceData.totalSakit}).
+- إجمالي الغياب عن المراسم: ${ceremonyAbsenceData.total} (بدون عذر: ${ceremonyAbsenceData.totalAlpha}، بإذن: ${ceremonyAbsenceData.totalIzin}، مرض: ${ceremonyAbsenceData.totalSakit}).
+
+قم بإنشاء ملخص تحليلي موجز في 2-3 جمل حول نمط سلوكه وحضوره في المهجع باللغة العربية. ركز على المشاكل المحتملة إن وجدت وقدم توصية موجزة إذا لزم الأمر.`;
+
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+            });
+
+            const md = window.markdownit();
+            setAiSummary(md.render(response.text));
+
+        } catch (error) {
+            console.error("Error generating AI summary:", error);
+            setSummaryError('فشل إنشاء الملخص. يرجى المحاولة مرة أخرى.');
+        } finally {
+            setIsGeneratingSummary(false);
+        }
+    };
 
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
@@ -338,13 +380,21 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-slate-800">ملخص الطالب</h2>
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <h2 className="text-3xl font-bold text-slate-800 self-start">ملخص الطالب</h2>
                  {(permissionData || prayerAbsenceData || ceremonyAbsenceData) && (
-                    <div className="flex items-center gap-2 no-print">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 no-print w-full md:w-auto">
+                         <button
+                            onClick={handleGenerateSummary}
+                            disabled={isGeneratingSummary || isExporting}
+                            className="flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50"
+                        >
+                            <SparklesIcon className="w-5 h-5" />
+                            <span>{isGeneratingSummary ? '...جاري الإنشاء' : 'إنشاء ملخص بالذكاء الاصطناعي'}</span>
+                        </button>
                         <button
                             onClick={handleExportPDF}
-                            disabled={isExporting}
+                            disabled={isExporting || isGeneratingSummary}
                             className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
                         >
                             <DownloadIcon className="w-5 h-5" />
@@ -352,7 +402,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         </button>
                          <button
                             onClick={handlePrint}
-                            disabled={isExporting}
+                            disabled={isExporting || isGeneratingSummary}
                             className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                         >
                             <PrinterIcon className="w-5 h-5" />
@@ -435,6 +485,18 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                         <MainTabButton isActive={activeTab === 'prayerAbsences'} onClick={() => setActiveTab('prayerAbsences')}>غياب الصلاة</MainTabButton>
                         <MainTabButton isActive={activeTab === 'ceremonyAbsences'} onClick={() => setActiveTab('ceremonyAbsences')}>غياب المراسم</MainTabButton>
                     </div>
+
+                     {(isGeneratingSummary || aiSummary || summaryError) && (
+                        <div className="bg-teal-50 border-l-4 border-teal-400 p-4 rounded-r-lg my-4 no-print">
+                            <h4 className="flex items-center gap-2 text-lg font-bold text-teal-800 mb-2">
+                                <SparklesIcon className="w-6 h-6" />
+                                ملخص بالذكاء الاصطناعي
+                            </h4>
+                            {isGeneratingSummary && <p className="text-teal-700">جاري إنشاء الملخص، يرجى الانتظار...</p>}
+                            {summaryError && <p className="text-red-600">{summaryError}</p>}
+                            {aiSummary && <div className="prose prose-sm text-teal-800" dangerouslySetInnerHTML={{ __html: aiSummary }} />}
+                        </div>
+                    )}
 
                     {activeTab === 'permissions' && permissionData && (
                         <div className="p-2 sm:p-6 space-y-6">

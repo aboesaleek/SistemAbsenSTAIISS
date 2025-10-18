@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { DocumentReportIcon } from '../icons/DocumentReportIcon';
 import { ChartBarIcon } from '../icons/ChartBarIcon';
 import { UserCircleIcon } from '../icons/UserCircleIcon';
@@ -6,13 +6,98 @@ import { PermissionIcon } from '../icons/PermissionIcon';
 import { AttendanceIcon } from '../icons/AttendanceIcon';
 // FIX: AcademicViewType is exported from AcademicDashboard, not types.ts.
 import { AcademicViewType } from '../../pages/AcademicDashboard';
-import { RecapStatus } from '../../types';
-import { TrendingUpIcon } from '../icons/TrendingUpIcon';
+import { RecapStatus, AttendanceRecord } from '../../types';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
-import { CheckCircleIcon } from '../icons/CheckCircleIcon';
-import { ClipboardListIcon } from '../icons/ClipboardListIcon';
-import { MedicalIcon } from '../icons/MedicalIcon';
+import { ChartCard } from '../shared/ChartCard';
 
+declare const Chart: any; // Mendeklarasikan Chart dari global scope untuk TypeScript
+
+const WeeklyAttendanceChart: React.FC<{ records: AttendanceRecord[] }> = ({ records }) => {
+    const chartRef = useRef<HTMLCanvasElement>(null);
+    const chartInstanceRef = useRef<any>(null);
+
+    const chartData = useMemo(() => {
+        const labels: string[] = [];
+        const absentData: number[] = [];
+        const permissionData: number[] = [];
+        const sickData: number[] = [];
+
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dateString = date.toISOString().split('T')[0];
+            
+            labels.push(date.toLocaleDateString('ar-SA', { weekday: 'short', day: 'numeric' }));
+
+            const recordsForDay = records.filter(r => r.date === dateString);
+            absentData.push(recordsForDay.filter(r => r.status === RecapStatus.ABSENT).length);
+            permissionData.push(recordsForDay.filter(r => r.status === RecapStatus.PERMISSION).length);
+            sickData.push(recordsForDay.filter(r => r.status === RecapStatus.SICK).length);
+        }
+
+        return { labels, absentData, permissionData, sickData };
+    }, [records]);
+
+    useEffect(() => {
+        if (chartRef.current) {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+            }
+
+            const ctx = chartRef.current.getContext('2d');
+            if (ctx) {
+                chartInstanceRef.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [
+                            {
+                                label: 'غائب',
+                                data: chartData.absentData,
+                                backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                                borderColor: 'rgba(239, 68, 68, 1)',
+                                borderWidth: 1,
+                            },
+                            {
+                                label: 'إذن',
+                                data: chartData.permissionData,
+                                backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 1,
+                            },
+                            {
+                                label: 'مرض',
+                                data: chartData.sickData,
+                                backgroundColor: 'rgba(234, 179, 8, 0.6)',
+                                borderColor: 'rgba(234, 179, 8, 1)',
+                                borderWidth: 1,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: { display: false },
+                            legend: { position: 'top', labels: { font: { family: 'Cairo' } } },
+                        },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } },
+                            x: { ticks: { font: { family: 'Cairo' } } }
+                        }
+                    }
+                });
+            }
+        }
+        return () => {
+            if (chartInstanceRef.current) {
+                chartInstanceRef.current.destroy();
+            }
+        };
+    }, [chartData]);
+    
+    return <canvas ref={chartRef}></canvas>;
+};
 
 interface AcademicHomeViewProps {
   navigateTo: (view: AcademicViewType) => void;
@@ -64,50 +149,16 @@ const ReportCard: React.FC<{
     </button>
 )
 
-const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; }> = ({ title, value, icon }) => (
-    <div className="bg-white p-3 sm:p-4 rounded-xl shadow-md border border-slate-200 flex items-center gap-3 sm:gap-4">
-        <div className="flex-shrink-0 bg-slate-100 rounded-full p-2 sm:p-3">
-            {icon}
-        </div>
-        <div>
-            <p className="text-slate-500 text-xs sm:text-sm font-semibold">{title}</p>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-800">{value}</p>
-        </div>
-    </div>
-);
-
-
 export const AcademicHomeView: React.FC<AcademicHomeViewProps> = ({ navigateTo }) => {
   const { records, loading } = useAcademicData();
 
-  const todayStats = useMemo(() => {
-    if (loading) return { permissions: 0, sick: 0, absences: 0 };
-
-    const today = new Date().toISOString().split('T')[0];
-    const todayRecords = records.filter(r => r.date === today);
-
-    return {
-      permissions: todayRecords.filter(r => r.status === RecapStatus.PERMISSION).length,
-      sick: todayRecords.filter(r => r.status === RecapStatus.SICK).length,
-      absences: todayRecords.filter(r => r.status === RecapStatus.ABSENT).length,
-    };
-  }, [records, loading]);
-
   return (
     <div className="space-y-8">
-      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
-          <div className="flex items-center gap-3 mb-4">
-              <TrendingUpIcon className="w-6 h-6 text-slate-600" />
-              <h3 className="text-xl font-bold text-slate-700">إحصائيات اليوم</h3>
-          </div>
-          {loading ? <div className="text-center py-4 text-slate-500">...جاري تحميل الإحصائيات</div> : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              <StatCard title="إذن" value={todayStats.permissions} icon={<CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />} />
-              <StatCard title="مرض" value={todayStats.sick} icon={<MedicalIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" />} />
-              <StatCard title="غائب" value={todayStats.absences} icon={<ClipboardListIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />} />
-          </div>
-          )}
-      </div>
+      {!loading && (
+        <ChartCard title="الرسم البياني للحضور الأسبوعي">
+            <WeeklyAttendanceChart records={records} />
+        </ChartCard>
+      )}
 
       <div>
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2 text-center">الوحدات الرئيسية</h2>

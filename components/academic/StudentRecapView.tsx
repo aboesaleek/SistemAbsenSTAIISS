@@ -3,12 +3,15 @@ import { AttendanceRecord, RecapStatus, Student } from '../../types';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { PrinterIcon } from '../icons/PrinterIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { GoogleGenAI } from '@google/genai';
 
-// Declare jsPDF and html2canvas from window for TypeScript
+// Declare jsPDF, html2canvas, and markdownit from window for TypeScript
 declare global {
   interface Window {
     jspdf: any;
     html2canvas: any;
+    markdownit: any;
   }
 }
 
@@ -91,6 +94,9 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [isExporting, setIsExporting] = useState(false);
     const recapContentRef = useRef<HTMLDivElement>(null);
     const [showSearchResults, setShowSearchResults] = useState(false);
+    const [aiSummary, setAiSummary] = useState('');
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+    const [summaryError, setSummaryError] = useState('');
     
     useEffect(() => {
       if (preselectedStudentId && students.length > 0) {
@@ -102,6 +108,12 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         }
       }
     }, [preselectedStudentId, students]);
+
+    useEffect(() => {
+        // Reset AI summary when student changes
+        setAiSummary('');
+        setSummaryError('');
+    }, [selectedStudentId]);
 
     const studentData = useMemo(() => {
         if (!selectedStudentId) return null;
@@ -301,6 +313,39 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
         }
     };
 
+    const handleGenerateSummary = async () => {
+        if (!studentData || !selectedStudentId) return;
+        setIsGeneratingSummary(true);
+        setAiSummary('');
+        setSummaryError('');
+    
+        try {
+            const studentName = students.find(s => s.id === selectedStudentId)?.name;
+            const absenceDates = studentData.absentRecords.map(r => r.date).join(', ');
+            
+            const prompt = `هذه هي بيانات الغياب للطالب ${studentName} خلال فترة واحدة: 
+- غائب ${studentData.absentRecords.length} مرة (في التواريخ التالية: ${absenceDates || 'لا يوجد'}).
+- إذن ${studentData.permissionRecords.length} مرة.
+- مريض ${studentData.sickRecords.length} مرة.
+- إجمالي عدد الأيام التي لم يحضر فيها: ${studentData.uniqueDays} يومًا.
+قم بإنشاء ملخص تحليلي موجز في 2-3 جمل حول نمط حضوره باللغة العربية. ركز على المشاكل المحتملة إن وجدت وقدم توصية موجزة إذا لزم الأمر.`;
+    
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+            });
+            
+            const md = window.markdownit();
+            setAiSummary(md.render(response.text));
+    
+        } catch (error) {
+            console.error("Error generating AI summary:", error);
+            setSummaryError('فشل إنشاء الملخص. يرجى المحاولة مرة أخرى.');
+        } finally {
+            setIsGeneratingSummary(false);
+        }
+    };
 
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
@@ -308,22 +353,30 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-slate-800">ملخص الطالب</h2>
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <h2 className="text-3xl font-bold text-slate-800 self-start">ملخص الطالب</h2>
                  {studentData && (
-                    <div className="flex items-center gap-2 no-print">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 no-print w-full md:w-auto">
+                        <button
+                            onClick={handleGenerateSummary}
+                            disabled={isGeneratingSummary || isExporting}
+                            className="flex items-center justify-center gap-2 w-full sm:w-auto bg-teal-500 text-white py-2 px-4 rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50"
+                        >
+                            <SparklesIcon className="w-5 h-5" />
+                            <span>{isGeneratingSummary ? '...جاري الإنشاء' : 'إنشاء ملخص بالذكاء الاصطناعي'}</span>
+                        </button>
                         <button
                             onClick={handleExportPDF}
-                            disabled={isExporting}
-                            className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
+                            disabled={isExporting || isGeneratingSummary}
+                            className="flex items-center justify-center gap-2 w-full sm:w-auto bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed"
                         >
                             <DownloadIcon className="w-5 h-5" />
                             <span>{isExporting ? '...جاري التصدير' : 'تصدير إلى PDF'}</span>
                         </button>
                          <button
                             onClick={handlePrint}
-                            disabled={isExporting}
-                            className="flex items-center justify-center gap-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
+                            disabled={isExporting || isGeneratingSummary}
+                            className="flex items-center justify-center gap-2 w-full sm:w-auto bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed"
                         >
                             <PrinterIcon className="w-5 h-5" />
                             <span>{isExporting ? '...جاري الطباعة' : 'طباعة'}</span>
@@ -420,6 +473,18 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                 ]} />
                             </div>
                         </div>
+
+                        {(isGeneratingSummary || aiSummary || summaryError) && (
+                            <div className="bg-teal-50 border-l-4 border-teal-400 p-4 rounded-r-lg no-print">
+                                <h4 className="flex items-center gap-2 text-lg font-bold text-teal-800 mb-2">
+                                    <SparklesIcon className="w-6 h-6" />
+                                    ملخص بالذكاء الاصطناعي
+                                </h4>
+                                {isGeneratingSummary && <p className="text-teal-700">جاري إنشاء الملخص، يرجى الانتظار...</p>}
+                                {summaryError && <p className="text-red-600">{summaryError}</p>}
+                                {aiSummary && <div className="prose prose-sm text-teal-800" dangerouslySetInnerHTML={{ __html: aiSummary }} />}
+                            </div>
+                        )}
                     
                         <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border">
                             <h3 className="text-xl font-bold text-slate-700 mb-4">تفاصيل السجل</h3>

@@ -155,9 +155,9 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
     return (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
             <div ref={recapContentRef} className="p-2 sm:p-6 printable-area">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
-                    <div className="no-print flex items-center gap-2">
+                <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
+                    <h3 className="text-2xl font-bold text-slate-800 self-start">{title}</h3>
+                    <div className="no-print flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                         <button
                             onClick={handleExportPDF}
                             disabled={isExporting}
