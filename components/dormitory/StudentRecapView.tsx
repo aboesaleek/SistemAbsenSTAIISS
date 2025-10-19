@@ -7,6 +7,8 @@ import { PrinterIcon } from '../icons/PrinterIcon';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { SparklesIcon } from '../icons/SparklesIcon';
 import { GoogleGenAI } from '@google/genai';
+import { useNotification } from '../../contexts/NotificationContext';
+import { ConfirmationDialog } from '../shared/ConfirmationDialog';
 
 // Declare jsPDF, html2canvas, and markdownit from window for TypeScript
 declare global {
@@ -95,6 +97,7 @@ interface StudentRecapViewProps {
 
 export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedStudentId }) => {
     const { dormitories, students, permissionRecords, prayerAbsences, ceremonyAbsences, loading, refetchData } = useDormitoryData();
+    const { showNotification } = useNotification();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
@@ -106,26 +109,23 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
     const [aiSummary, setAiSummary] = useState('');
     const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
     const [summaryError, setSummaryError] = useState('');
+    const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'prayer' | 'ceremony' | 'permission' } | null>(null);
 
-    const deleteAbsenceRecord = async (id: string, type: 'prayer' | 'ceremony') => {
-        const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : 'dormitory_ceremony_absences';
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
+
+        const { id, type } = confirmDelete;
+        const tableName = type === 'prayer' ? 'dormitory_prayer_absences' : type === 'ceremony' ? 'dormitory_ceremony_absences' : 'dormitory_permissions';
+        
         const { error } = await supabase.from(tableName).delete().eq('id', id);
         if (error) {
-            console.error(`Gagal menghapus catatan: ${error.message}`);
+            showNotification(`فشل في حذف السجل: ${error.message}`, 'error');
         } else {
+            showNotification('تم حذف السجل بنجاح.', 'success');
             refetchData();
         }
     };
     
-    const deletePermissionRecord = async (id: string) => {
-        const { error } = await supabase.from('dormitory_permissions').delete().eq('id', id);
-        if (error) {
-            console.error(`Gagal menghapus catatan: ${error.message}`);
-        } else {
-            refetchData();
-        }
-    }
-
     useEffect(() => {
       if (preselectedStudentId && students.length > 0) {
         const student = students.find(s => s.id === preselectedStudentId);
@@ -380,6 +380,13 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
 
     return (
         <div className="space-y-6">
+            <ConfirmationDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDelete}
+                title="تأكيد الحذف"
+                message="هل أنت متأكد أنك تريد حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء."
+            />
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
                 <h2 className="text-3xl font-bold text-slate-800 self-start">ملخص الطالب</h2>
                  {(permissionData || prayerAbsenceData || ceremonyAbsenceData) && (
@@ -545,7 +552,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="عدد الأيام" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.number_of_days}</td>
                                                         <td data-label="البيان" className="px-2 py-3 sm:px-6 sm:py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
                                                         <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap no-print">
-                                                            <button onClick={() => deletePermissionRecord(record.id)} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                                            <button onClick={() => setConfirmDelete({ id: record.id, type: 'permission' })} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -604,7 +611,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="الصلاة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.prayer}</td>
                                                         <td data-label="الحالة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
                                                         <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap no-print">
-                                                            <button onClick={() => deleteAbsenceRecord(record.id, 'prayer')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                                            <button onClick={() => setConfirmDelete({ id: record.id, type: 'prayer' })} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -659,7 +666,7 @@ export const StudentRecapView: React.FC<StudentRecapViewProps> = ({ preselectedS
                                                         <td data-label="التاريخ" className="px-2 py-3 sm:px-6 sm:py-4 font-semibold whitespace-nowrap">{record.date}</td>
                                                         <td data-label="الحالة" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{ceremonyStatusToLabel[record.status]}</td>
                                                         <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap no-print">
-                                                            <button onClick={() => deleteAbsenceRecord(record.id, 'ceremony')} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
+                                                            <button onClick={() => setConfirmDelete({ id: record.id, type: 'ceremony' })} className="text-red-600 hover:text-red-800"><DeleteIcon className="w-5 h-5" /></button>
                                                         </td>
                                                     </tr>
                                                 ))

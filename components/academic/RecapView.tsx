@@ -7,6 +7,8 @@ import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { Pagination } from '../shared/Pagination';
 import { SparklesIcon } from '../icons/SparklesIcon';
 import { GoogleGenAI } from '@google/genai';
+import { useNotification } from '../../contexts/NotificationContext';
+import { ConfirmationDialog } from '../shared/ConfirmationDialog';
 
 // Declare XLSX and markdownit from window for TypeScript
 declare global {
@@ -33,6 +35,7 @@ interface RecapViewProps {
 
 export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
     const { classes, records: allRecords, loading, refetchData } = useAcademicData();
+    const { showNotification } = useNotification();
     
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedClassId, setSelectedClassId] = useState('');
@@ -43,6 +46,7 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
     const [aiAnalysis, setAiAnalysis] = useState('');
     const [isGeneratingAnalysis, setIsGeneratingAnalysis] = useState(false);
     const [analysisError, setAnalysisError] = useState('');
+    const [confirmDelete, setConfirmDelete] = useState<CombinedRecord | null>(null);
 
     // Transform records from context to include sourceId and sourceType for deletion
     const combinedRecords = useMemo((): CombinedRecord[] => {
@@ -69,14 +73,18 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
         return filteredRecords.slice(startIndex, startIndex + itemsPerPage);
     }, [filteredRecords, currentPage, itemsPerPage]);
 
-    const deleteRecord = async (record: CombinedRecord) => {
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
+
+        const record = confirmDelete;
         const tableName = record.sourceType === 'permission' ? 'academic_permissions' : 'academic_absences';
         const { error } = await supabase.from(tableName).delete().eq('id', record.sourceId);
 
         if (error) {
-            console.error(`فشل الحذف: ${error.message}`);
+            showNotification(`فشل الحذف: ${error.message}`, 'error');
         } else {
-            refetchData(); // Refresh data terpusat
+            showNotification('تم حذف السجل بنجاح.', 'success');
+            refetchData();
         }
     };
 
@@ -167,6 +175,13 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
 
     return (
         <div className="space-y-6">
+            <ConfirmationDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDelete}
+                title="تأكيد الحذف"
+                message="هل أنت متأكد أنك تريد حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء."
+            />
             <h2 className="text-3xl font-bold text-slate-800">الملخص العام</h2>
             
             <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 space-y-4">
@@ -261,7 +276,7 @@ export const RecapView: React.FC<RecapViewProps> = ({ onStudentSelect }) => {
                                             </span>
                                         </td>
                                         <td className="px-2 py-3 sm:px-6 sm:py-4 action-cell whitespace-nowrap">
-                                            <button onClick={() => deleteRecord(record)} className="text-red-600 hover:text-red-800">
+                                            <button onClick={() => setConfirmDelete(record)} className="text-red-600 hover:text-red-800">
                                                 <DeleteIcon className="w-5 h-5" />
                                             </button>
                                         </td>

@@ -5,6 +5,8 @@ import { DeleteIcon } from '../icons/DeleteIcon';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { RecapStatus } from '../../types';
 import { Pagination } from '../shared/Pagination';
+import { useNotification } from '../../contexts/NotificationContext';
+import { ConfirmationDialog } from '../shared/ConfirmationDialog';
 
 interface AbsenceFollowUpRecord {
     id: string; 
@@ -41,7 +43,9 @@ const addConfirmedId = (id: string) => {
 
 export const FollowUpView: React.FC = () => {
     const { records: allRecords, loading, refetchData } = useAcademicData();
+    const { showNotification } = useNotification();
     const [absences, setAbsences] = useState<AbsenceFollowUpRecord[]>([]);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
     // State for pagination and search
     const [searchQuery, setSearchQuery] = useState('');
@@ -81,19 +85,24 @@ export const FollowUpView: React.FC = () => {
     const handleConfirm = (absenceId: string) => {
         addConfirmedId(absenceId);
         setAbsences(prev => prev.filter(a => a.id !== absenceId));
+        showNotification('تم تأكيد المتابعة.', 'success');
     };
 
-    const handleDelete = async (absenceId: string) => {
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
+
+        const absenceId = confirmDelete;
         const { error } = await supabase.from('academic_absences').delete().eq('id', absenceId);
         if (error) {
-            console.error('Gagal menghapus absensi:', error.message);
+            showNotification(`فشل في حذف الغياب: ${error.message}`, 'error');
         } else {
             const confirmedIds = getConfirmedIds();
             if (confirmedIds.has(absenceId)) {
                 confirmedIds.delete(absenceId);
                 localStorage.setItem(CONFIRMED_IDS_STORAGE_KEY, JSON.stringify(Array.from(confirmedIds)));
             }
-            refetchData(); // Refresh data terpusat
+            refetchData();
+            showNotification('تم حذف سجل الغياب بنجاح.', 'success');
         }
     };
 
@@ -103,6 +112,13 @@ export const FollowUpView: React.FC = () => {
 
     return (
         <div className="space-y-6">
+             <ConfirmationDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDelete}
+                title="تأكيد الحذف"
+                message="هل أنت متأكد أنك تريد حذف سجل الغياب هذا بشكل دائم؟ لا يمكن التراجع عن هذا الإجراء."
+            />
             <h2 className="text-3xl font-bold text-slate-800">متابعة الغياب</h2>
             <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
                 <div className="p-2 sm:p-6">
@@ -144,7 +160,7 @@ export const FollowUpView: React.FC = () => {
                                                     <button onClick={() => handleConfirm(record.id)} className="text-green-600 hover:text-green-800" title="تأكيد المتابعة">
                                                         <CheckIcon className="w-5 h-5" />
                                                     </button>
-                                                    <button onClick={() => handleDelete(record.id)} className="text-red-600 hover:text-red-800" title="حذف الغياب نهائياً">
+                                                    <button onClick={() => setConfirmDelete(record.id)} className="text-red-600 hover:text-red-800" title="حذف الغياب نهائياً">
                                                         <DeleteIcon className="w-5 h-5" />
                                                     </button>
                                                 </div>

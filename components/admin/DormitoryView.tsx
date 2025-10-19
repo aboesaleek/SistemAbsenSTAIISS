@@ -5,6 +5,8 @@ import { DeleteIcon } from '../icons/DeleteIcon';
 import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
 import { Pagination } from '../shared/Pagination';
+import { useNotification } from '../../contexts/NotificationContext';
+import { ConfirmationDialog } from '../shared/ConfirmationDialog';
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
@@ -32,8 +34,9 @@ export const DormitoryView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isAddingDorm, setIsAddingDorm] = useState(false);
     const [isAddingStudent, setIsAddingStudent] = useState(false);
-    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
     const [activeTab, setActiveTab] = useState<'dormitories' | 'students'>('dormitories');
+    const [confirmDelete, setConfirmDelete] = useState<{ id: string | number, tableName: string } | null>(null);
+    const { showNotification } = useNotification();
     
     // State for pagination and search
     const [searchQuery, setSearchQuery] = useState('');
@@ -79,7 +82,7 @@ export const DormitoryView: React.FC = () => {
             setStudents(studentsData || []);
         } catch (error: any) {
             console.error('Error fetching dormitory data:', error);
-            setMessage({ type: 'error', text: 'فشل في جلب بيانات المهجع.' });
+            showNotification('فشل في جلب بيانات المهجع.', 'error');
         } finally {
             setLoading(false);
         }
@@ -98,18 +101,15 @@ export const DormitoryView: React.FC = () => {
     ) => {
         const content = ref.current?.value;
         if (!content?.trim()) {
-            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} لإضافتها.` });
-            setTimeout(() => setMessage(null), 5000);
+            showNotification(`يرجى إدخال ${itemType} لإضافتها.`, 'error');
             return;
         }
 
         setLoadingState(true);
-        setMessage(null);
-
         const items = content.split('\n').map(name => ({ name: name.trim(), ...additionalData })).filter(item => item.name);
         
         if (items.length === 0) {
-            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} صالحة لإضافتها.` });
+            showNotification(`يرجى إدخال ${itemType} صالحة لإضافتها.`, 'error');
             setLoadingState(false);
             return;
         }
@@ -117,26 +117,29 @@ export const DormitoryView: React.FC = () => {
         const { error } = await supabase.from(tableName).insert(items);
         
         if (error) {
-            setMessage({ type: 'error', text: `فشل في الإضافة: ${error.message}` });
+            showNotification(`فشل في الإضافة: ${error.message}`, 'error');
         } else {
-            setMessage({ type: 'success', text: `تمت إضافة ${items.length} ${itemType} بنجاح.` });
+            showNotification(`تمت إضافة ${items.length} ${itemType} بنجاح.`, 'success');
             ref.current!.value = '';
             fetchData(); // Refresh data
         }
-
         setLoadingState(false);
-        setTimeout(() => setMessage(null), 5000);
     };
     
-    const handleDelete = async (id: string | number, tableName: string) => {
-        if (!window.confirm('هل أنت متأكد أنك تريد حذف هذا العنصر؟')) return;
-        
+    const requestDelete = (id: string | number, tableName: string) => {
+        setConfirmDelete({ id, tableName });
+    };
+
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
+
+        const { id, tableName } = confirmDelete;
         const { error } = await supabase.from(tableName).delete().eq('id', id);
 
         if (error) {
-            setMessage({ type: 'error', text: `فشل في الحذف: ${error.message}` });
+            showNotification(`فشل في الحذف: ${error.message}`, 'error');
         } else {
-             setMessage({ type: 'success', text: 'تم حذف العنصر بنجاح.' });
+             showNotification('تم حذف العنصر بنجاح.', 'success');
             fetchData(); // Refresh data
         }
     };
@@ -178,7 +181,7 @@ export const DormitoryView: React.FC = () => {
                                             <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
                                                 <EditIcon className="w-5 h-5" />
                                             </button>
-                                            <button onClick={() => handleDelete(paginatedItems[rowIndex].id, activeTab)} className="text-red-600 hover:text-red-800">
+                                            <button onClick={() => requestDelete(paginatedItems[rowIndex].id, activeTab)} className="text-red-600 hover:text-red-800">
                                                 <DeleteIcon className="w-5 h-5" />
                                             </button>
                                         </div>
@@ -198,13 +201,14 @@ export const DormitoryView: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            <ConfirmationDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDelete}
+                title="تأكيد الحذف"
+                message="هل أنت متأكد أنك تريد حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء."
+            />
             <h2 className="text-3xl font-bold text-slate-800">إدارة شؤون المهجع</h2>
-
-            {message && (
-                <div className={`p-4 rounded-md text-center ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {message.text}
-                </div>
-            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card title="إضافة مهاجع">
@@ -224,8 +228,7 @@ export const DormitoryView: React.FC = () => {
                     <button onClick={() => {
                         const dormitoryId = newStudentDormRef.current?.value;
                         if (!dormitoryId) {
-                            setMessage({ type: 'error', text: 'يرجى اختيار المهجع أولاً.' });
-                            setTimeout(() => setMessage(null), 5000);
+                            showNotification('يرجى اختيار المهجع أولاً.', 'error');
                             return;
                         }
                         // This assumes you add new students here.

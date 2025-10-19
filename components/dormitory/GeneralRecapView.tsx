@@ -6,6 +6,8 @@ import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { DownloadIcon } from '../icons/DownloadIcon';
 import { Pagination } from '../shared/Pagination';
+import { useNotification } from '../../contexts/NotificationContext';
+import { ConfirmationDialog } from '../shared/ConfirmationDialog';
 
 // Declare jsPDF and html2canvas from window for TypeScript
 declare global {
@@ -34,12 +36,14 @@ interface GenericDormitoryRecapProps {
 
 const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissionType, title, onStudentSelect }) => {
     const { dormitories, students, permissionRecords, loading, refetchData } = useDormitoryData();
+    const { showNotification } = useNotification();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const recapContentRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
     const records = useMemo(() => {
         const studentsMap = new Map<string, Student>(students.map(s => [s.id, s]));
@@ -76,11 +80,14 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
         return filteredRecords.slice(startIndex, startIndex + itemsPerPage);
     }, [filteredRecords, currentPage, itemsPerPage]);
 
-    const deleteRecord = async (id: string) => {
-        const { error } = await supabase.from('dormitory_permissions').delete().eq('id', id);
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
+
+        const { error } = await supabase.from('dormitory_permissions').delete().eq('id', confirmDelete);
         if (error) {
-            console.error(`Gagal menghapus catatan: ${error.message}`);
+            showNotification(`فشل في حذف السجل: ${error.message}`, 'error');
         } else {
+            showNotification('تم حذف السجل بنجاح.', 'success');
             refetchData();
         }
     };
@@ -154,6 +161,13 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
     
     return (
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+            <ConfirmationDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDelete}
+                title="تأكيد الحذف"
+                message="هل أنت متأكد أنك تريد حذف هذا السجل؟ لا يمكن التراجع عن هذا الإجراء."
+            />
             <div ref={recapContentRef} className="p-2 sm:p-6 printable-area">
                 <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-4">
                     <h3 className="text-2xl font-bold text-slate-800 self-start">{title}</h3>
@@ -217,7 +231,7 @@ const GenericDormitoryRecap: React.FC<GenericDormitoryRecapProps> = ({ permissio
                                     <td data-label="عدد الأيام" className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{record.numberOfDays}</td>
                                     <td data-label="البيان" className="px-2 py-3 sm:px-6 sm:py-4 text-slate-500 whitespace-nowrap">{record.reason || '-'}</td>
                                     <td className="px-2 py-3 sm:px-6 sm:py-4 no-print action-cell whitespace-nowrap">
-                                        <button onClick={() => deleteRecord(record.id)} className="text-red-600 hover:text-red-800">
+                                        <button onClick={() => setConfirmDelete(record.id)} className="text-red-600 hover:text-red-800">
                                             <DeleteIcon className="w-5 h-5" />
                                         </button>
                                     </td>

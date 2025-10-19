@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { BackgroundProvider } from './contexts/BackgroundContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -12,7 +13,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <BackgroundProvider>
-      <App />
+      <NotificationProvider>
+        <App />
+      </NotificationProvider>
     </BackgroundProvider>
   </React.StrictMode>
 );

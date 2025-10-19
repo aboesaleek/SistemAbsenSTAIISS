@@ -5,6 +5,7 @@ import { DeleteIcon } from '../icons/DeleteIcon';
 import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
 import { Pagination } from '../shared/Pagination';
+import { useNotification } from '../../contexts/NotificationContext';
 
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -18,7 +19,7 @@ export const UsersView: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+    const { showNotification } = useNotification();
 
     // State for pagination and search
     const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +44,7 @@ export const UsersView: React.FC = () => {
             if (error) throw error;
             setUsers(data || []);
         } catch (error: any) {
-            setMessage({ type: 'error', text: `فشل في جلب المستخدمين: ${error.message}` });
+            showNotification(`فشل في جلب المستخدمين: ${error.message}`, 'error');
         } finally {
             setLoading(false);
         }
@@ -56,14 +57,13 @@ export const UsersView: React.FC = () => {
     const handleAddUser = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        setMessage(null);
 
         const email = emailRef.current?.value;
         const password = passwordRef.current?.value;
         const role = roleRef.current?.value as AppRole;
 
         if (!email || !password || !role) {
-            setMessage({ type: 'error', text: "يرجى ملء جميع الحقول." });
+            showNotification("يرجى ملء جميع الحقول.", 'error');
             setIsSubmitting(false);
             return;
         }
@@ -83,20 +83,20 @@ export const UsersView: React.FC = () => {
             } else if (userMessage.includes("Password should be at least 6 characters")) {
                 userMessage = "يجب أن تكون كلمة المرور مكونة من 6 أحرف على الأقل.";
             }
-            setMessage({ type: 'error', text: `فشل في إنشاء المستخدم: ${userMessage}` });
+            showNotification(`فشل في إنشاء المستخدم: ${userMessage}`, 'error');
             setIsSubmitting(false);
             return;
         }
         
-        setMessage({ type: 'success', text: "تمت إضافة المستخدم بنجاح! سيظهر في القائمة بعد لحظات." });
+        showNotification("تمت إضافة المستخدم بنجاح!", 'success');
         
+        // Use a short delay to allow the new user to be available in the profiles table.
         setTimeout(() => fetchUsers(), 1000);
 
         if (emailRef.current) emailRef.current.value = '';
         if (passwordRef.current) passwordRef.current.value = '';
 
         setIsSubmitting(false);
-        setTimeout(() => setMessage(null), 8000);
     };
 
     if (loading && users.length === 0) {
@@ -106,12 +106,6 @@ export const UsersView: React.FC = () => {
     return (
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">إدارة المستخدمين</h2>
-            
-            {message && (
-                <div className={`p-4 mb-6 rounded-md text-center whitespace-pre-line ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {message.text}
-                </div>
-            )}
 
             <Card title="إضافة مستخدم جديد">
                 <form className="space-y-4" onSubmit={handleAddUser}>

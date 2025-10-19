@@ -3,6 +3,7 @@ import { Student, CeremonyStatus, ceremonyStatusToLabel, DormitoryCeremonyAbsenc
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
+import { useNotification } from '../../contexts/NotificationContext';
 
 const statusColorMap: { [key in CeremonyStatus]: { bg: string, text: string, border: string } } = {
   [CeremonyStatus.ALPHA]: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-500' },
@@ -66,12 +67,12 @@ interface CeremonyAbsenceViewProps {
 
 export const CeremonyAbsenceView: React.FC<CeremonyAbsenceViewProps> = ({ onStudentSelect }) => {
     const { dormitories, students, ceremonyAbsences, loading, refetchData } = useDormitoryData();
+    const { showNotification } = useNotification();
 
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
     const [studentStatuses, setStudentStatuses] = useState<Map<string, CeremonyStatus>>(new Map());
     const [interactionStarted, setInteractionStarted] = useState(false);
-    const [submitStatus, setSubmitStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const todayRecords = useMemo(() => {
         const today = new Date().toISOString().split('T')[0];
@@ -98,18 +99,17 @@ export const CeremonyAbsenceView: React.FC<CeremonyAbsenceViewProps> = ({ onStud
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSubmitStatus(null);
         if (studentStatuses.size === 0) {
-            setSubmitStatus({ type: 'error', text: 'لم يتم تحديد غياب أي طالب.' });
+            showNotification('لم يتم تحديد غياب أي طالب.', 'error');
             return;
         }
         
         const absenceData = Array.from(studentStatuses.entries()).map(([studentId, status]) => ({ student_id: studentId, date, status }));
         const { error } = await supabase.from('dormitory_ceremony_absences').insert(absenceData);
         if (error) {
-            setSubmitStatus({ type: 'error', text: `فشل حفظ الغياب: ${error.message}` });
+            showNotification(`فشل حفظ الغياب: ${error.message}`, 'error');
         } else {
-            setSubmitStatus({ type: 'success', text: `تم حفظ غياب ${absenceData.length} طالب بنجاح.` });
+            showNotification(`تم حفظ غياب ${absenceData.length} طالب بنجاح.`, 'success');
             refetchData();
             setStudentStatuses(new Map());
             setSelectedDormitoryId('');
@@ -121,8 +121,6 @@ export const CeremonyAbsenceView: React.FC<CeremonyAbsenceViewProps> = ({ onStud
 
     return (
         <>
-            {submitStatus && <div className={`p-4 mb-4 rounded-md text-center ${submitStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{submitStatus.text}</div>}
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                     <label htmlFor="dorm-select" className="block text-sm font-semibold text-slate-700 mb-2">المهجع</label>

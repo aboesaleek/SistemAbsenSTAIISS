@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../supabaseClient';
 import { PlusIcon } from '../icons/PlusIcon';
+import { useNotification } from '../../contexts/NotificationContext';
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
@@ -19,7 +20,7 @@ export const SettingsView: React.FC = () => {
     const [previewUrl, setPreviewUrl] = useState('');
     const [loading, setLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const { showNotification } = useNotification();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     
@@ -41,7 +42,7 @@ export const SettingsView: React.FC = () => {
                     setPreviewUrl('');
                 }
             } catch (error: any) {
-                setMessage({ type: 'error', text: `فشل في جلب الخلفية الحالية: ${error.message}` });
+                showNotification(`فشل في جلب الخلفية الحالية: ${error.message}`, 'error');
             } finally {
                 setLoading(false);
             }
@@ -60,12 +61,11 @@ export const SettingsView: React.FC = () => {
 
     const handleUpload = async () => {
         if (!newBackgroundFile) {
-            setMessage({ type: 'error', text: 'يرجى تحديد ملف أولاً.' });
+            showNotification('يرجى تحديد ملف أولاً.', 'error');
             return;
         }
 
         setIsUploading(true);
-        setMessage(null);
 
         try {
             // 1. Upload new image, overwriting the old one.
@@ -98,7 +98,7 @@ export const SettingsView: React.FC = () => {
             setCurrentBackgroundUrl(newUrlWithCacheBust);
             setPreviewUrl(newUrlWithCacheBust);
             setNewBackgroundFile(null);
-            setMessage({ type: 'success', text: 'تم تحديث صورة الخلفية بنجاح.' });
+            showNotification('تم تحديث صورة الخلفية بنجاح.', 'success');
 
         } catch (error: any) {
             let errorMessage = `فشل في تحميل الصورة: ${error.message}`;
@@ -107,7 +107,7 @@ export const SettingsView: React.FC = () => {
             } else if (error.message.includes('new row violates row-level security policy')) {
                 errorMessage = `فشل في تحديث الإعدادات: ليس لديك إذن. تأكد من أن لدى المسؤولين الكبار أذونات الكتابة على جدول 'app_settings'.`;
             }
-            setMessage({ type: 'error', text: errorMessage });
+            showNotification(errorMessage, 'error');
         } finally {
             setIsUploading(false);
         }
@@ -117,12 +117,6 @@ export const SettingsView: React.FC = () => {
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">إعدادات المظهر</h2>
             
-            {message && (
-                <div className={`p-4 rounded-md text-center ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {message.text}
-                </div>
-            )}
-
             <Card title="خلفية صفحة تسجيل الدخول">
                 <div className="space-y-4">
                     <p className="text-sm text-slate-500">

@@ -1,4 +1,5 @@
 
+
 export enum AppMode {
   ACADEMIC = 'academic',
   DORMITORY = 'dormitory',
@@ -187,4 +188,27 @@ export interface DormitoryCeremonyAbsence {
   dormitoryName: string;
   date: string;
   status: CeremonyStatus;
+}
+
+export enum DayOfWeek {
+  SUNDAY = 0,
+  MONDAY = 1,
+  TUESDAY = 2,
+  WEDNESDAY = 3,
+  THURSDAY = 4,
+}
+
+export const DayOfWeekLabel: { [key in DayOfWeek]: string } = {
+  [DayOfWeek.SUNDAY]: 'الأحد',
+  [DayOfWeek.MONDAY]: 'الاثنين',
+  [DayOfWeek.TUESDAY]: 'الثلاثاء',
+  [DayOfWeek.WEDNESDAY]: 'الأربعاء',
+  [DayOfWeek.THURSDAY]: 'الخميس',
+};
+
+export interface CourseSchedule {
+  id: string;
+  class_id: string;
+  course_id: string;
+  day_of_week: DayOfWeek;
 }

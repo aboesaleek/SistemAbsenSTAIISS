@@ -3,16 +3,17 @@ import { Student, DormitoryPermissionType } from '../../types';
 import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
+import { useNotification } from '../../contexts/NotificationContext';
 
 
 export const PermissionsView: React.FC = () => {
     const { dormitories, students, loading, refetchData } = useDormitoryData();
+    const { showNotification } = useNotification();
 
     const [permissionType, setPermissionType] = useState<DormitoryPermissionType>(DormitoryPermissionType.GENERAL_LEAVE);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [numberOfDays, setNumberOfDays] = useState(1);
     const [reason, setReason] = useState('');
-    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
     
     const [selectedStudentId, setSelectedStudentId] = useState('');
     const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
@@ -77,13 +78,12 @@ export const PermissionsView: React.FC = () => {
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setMessage(null);
 
         const isGroup = permissionType === DormitoryPermissionType.GROUP_LEAVE;
         const studentIds = isGroup ? Array.from(selectedStudentIds) : (selectedStudentId ? [selectedStudentId] : []);
         
         if (studentIds.length === 0 || !date) {
-            setMessage({ type: 'error', text: 'يرجى اختيار طالب واحد على الأقل وتحديد التاريخ.' });
+            showNotification('يرجى اختيار طالب واحد على الأقل وتحديد التاريخ.', 'error');
             return;
         }
 
@@ -103,11 +103,11 @@ export const PermissionsView: React.FC = () => {
                 .lte('date', lastDayOfMonth.toISOString().split('T')[0]);
 
             if (checkError) {
-                 setMessage({ type: 'error', text: `خطأ في التحقق من الإذن الحالي: ${checkError.message}` });
+                 showNotification(`خطأ في التحقق من الإذن الحالي: ${checkError.message}`, 'error');
                  return;
             }
             if (count && count > 0) {
-                setMessage({ type: 'error', text: 'هذا الطالب قد أخذ إذن مبيت بالفعل في هذا الشهر.' });
+                showNotification('هذا الطالب قد أخذ إذن مبيت بالفعل في هذا الشهر.', 'error');
                 return;
             }
         }
@@ -123,9 +123,9 @@ export const PermissionsView: React.FC = () => {
         const { error } = await supabase.from('dormitory_permissions').insert(permissionsToInsert);
 
         if (error) {
-            setMessage({ type: 'error', text: `فشل تسجيل الإذن: ${error.message}` });
+            showNotification(`فشل تسجيل الإذن: ${error.message}`, 'error');
         } else {
-            setMessage({ type: 'success', text: `تم تسجيل الإذن لـ ${permissionsToInsert.length} طالب بنجاح.` });
+            showNotification(`تم تسجيل الإذن لـ ${permissionsToInsert.length} طالب بنجاح.`, 'success');
             refetchData();
             resetForm();
         }
@@ -145,11 +145,6 @@ export const PermissionsView: React.FC = () => {
     return (
         <div className="max-w-4xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-slate-200">
             <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">تسجيل إذن المهجع</h2>
-            {message && (
-                <div className={`p-4 mb-4 rounded-md text-center ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {message.text}
-                </div>
-            )}
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                     <label className="block text-lg font-semibold text-slate-700 mb-3">نوع الإذن</label>

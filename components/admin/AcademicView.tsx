@@ -5,6 +5,8 @@ import { DeleteIcon } from '../icons/DeleteIcon';
 import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
 import { Pagination } from '../shared/Pagination';
+import { useNotification } from '../../contexts/NotificationContext';
+import { ConfirmationDialog } from '../shared/ConfirmationDialog';
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
@@ -34,8 +36,9 @@ export const AcademicView: React.FC = () => {
     const [isAddingClass, setIsAddingClass] = useState(false);
     const [isAddingStudent, setIsAddingStudent] = useState(false);
     const [isAddingCourse, setIsAddingCourse] = useState(false);
-    const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
     const [activeTab, setActiveTab] = useState<'classes' | 'students' | 'courses'>('classes');
+    const [confirmDelete, setConfirmDelete] = useState<{ id: string | number, tableName: string } | null>(null);
+    const { showNotification } = useNotification();
 
     // State for pagination and search
     const [searchQuery, setSearchQuery] = useState('');
@@ -56,8 +59,8 @@ export const AcademicView: React.FC = () => {
         let items: (Class | Student | Course)[] = [];
         if (activeTab === 'classes') items = classes;
         else if (activeTab === 'students') items = students;
-        else items = courses;
-
+        else if (activeTab === 'courses') items = courses;
+        
         const filtered = items.filter(item =>
             item.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
@@ -87,7 +90,7 @@ export const AcademicView: React.FC = () => {
             setCourses(coursesData || []);
         } catch (error: any) {
             console.error('Error fetching academic data:', error);
-            setMessage({ type: 'error', text: 'فشل في جلب البيانات الأكاديمية.' });
+            showNotification('فشل في جلب البيانات الأكاديمية.', 'error');
         } finally {
             setLoading(false);
         }
@@ -106,18 +109,16 @@ export const AcademicView: React.FC = () => {
     ) => {
         const content = ref.current?.value;
         if (!content?.trim()) {
-            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} لإضافتها.` });
-            setTimeout(() => setMessage(null), 5000);
+            showNotification(`يرجى إدخال ${itemType} لإضافتها.`, 'error');
             return;
         }
 
         setLoadingState(true);
-        setMessage(null);
 
         const items = content.split('\n').map(name => ({ name: name.trim(), ...additionalData })).filter(item => item.name);
         
         if (items.length === 0) {
-            setMessage({ type: 'error', text: `يرجى إدخال ${itemType} صالحة لإضافتها.` });
+            showNotification(`يرجى إدخال ${itemType} صالحة لإضافتها.`, 'error');
             setLoadingState(false);
             return;
         }
@@ -125,26 +126,30 @@ export const AcademicView: React.FC = () => {
         const { error } = await supabase.from(tableName).insert(items);
         
         if (error) {
-            setMessage({ type: 'error', text: `فشل في الإضافة: ${error.message}` });
+            showNotification(`فشل في الإضافة: ${error.message}`, 'error');
         } else {
-            setMessage({ type: 'success', text: `تمت إضافة ${items.length} ${itemType} بنجاح.` });
+            showNotification(`تمت إضافة ${items.length} ${itemType} بنجاح.`, 'success');
             ref.current!.value = '';
             fetchData(); // Refresh data
         }
 
         setLoadingState(false);
-        setTimeout(() => setMessage(null), 5000);
     };
 
-    const handleDelete = async (id: string | number, tableName: string) => {
-        if (!window.confirm('هل أنت متأكد أنك تريد حذف هذا العنصر؟')) return;
+    const requestDelete = (id: string | number, tableName: string) => {
+        setConfirmDelete({ id, tableName });
+    };
+
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
         
+        const { id, tableName } = confirmDelete;
         const { error } = await supabase.from(tableName).delete().eq('id', id);
 
         if (error) {
-            setMessage({ type: 'error', text: `فشل في الحذف: ${error.message}` });
+            showNotification(`فشل في الحذف: ${error.message}`, 'error');
         } else {
-            setMessage({ type: 'success', text: 'تم حذف العنصر بنجاح.' });
+            showNotification('تم حذف العنصر بنجاح.', 'success');
             fetchData(); // Refresh data
         }
     };
@@ -193,7 +198,7 @@ export const AcademicView: React.FC = () => {
                                             <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
                                                 <EditIcon className="w-5 h-5" />
                                             </button>
-                                            <button onClick={() => handleDelete(paginatedItems[rowIndex].id, activeTab)} className="text-red-600 hover:text-red-800">
+                                            <button onClick={() => requestDelete(paginatedItems[rowIndex].id, activeTab)} className="text-red-600 hover:text-red-800">
                                                 <DeleteIcon className="w-5 h-5" />
                                             </button>
                                         </div>
@@ -209,13 +214,14 @@ export const AcademicView: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            <ConfirmationDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDelete}
+                title="تأكيد الحذف"
+                message="هل أنت متأكد أنك تريد حذف هذا العنصر؟ لا يمكن التراجع عن هذا الإجراء."
+            />
             <h2 className="text-3xl font-bold text-slate-800">إدارة الشؤون الأكاديمية</h2>
-            
-            {message && (
-                <div className={`p-4 rounded-md text-center ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {message.text}
-                </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <Card title="إضافة فصول دراسية">
@@ -235,8 +241,7 @@ export const AcademicView: React.FC = () => {
                     <button onClick={() => {
                         const classId = newStudentClassRef.current?.value;
                         if (!classId) {
-                            setMessage({ type: 'error', text: 'يرجى اختيار الفصل الدراسي أولاً.' });
-                            setTimeout(() => setMessage(null), 5000);
+                            showNotification('يرجى اختيار الفصل الدراسي أولاً.', 'error');
                             return;
                         }
                         handleGenericAdd(newStudentsRef, 'students', setIsAddingStudent, 'طلاب', { class_id: classId });
@@ -255,7 +260,7 @@ export const AcademicView: React.FC = () => {
             
             <div className="bg-white rounded-xl shadow-md border border-slate-200">
                 <div className="px-6 pt-4 border-b border-slate-200">
-                    <nav className="-mb-px flex gap-6" aria-label="Tabs">
+                    <nav className="-mb-px flex gap-6 overflow-x-auto" aria-label="Tabs">
                         <TabButton isActive={activeTab === 'classes'} onClick={() => setActiveTab('classes')}>
                             الفصول الدراسية ({classes.length})
                         </TabButton>
@@ -267,7 +272,7 @@ export const AcademicView: React.FC = () => {
                         </TabButton>
                     </nav>
                 </div>
-                 <div className="p-2 sm:p-6">
+                <div className="p-2 sm:p-6">
                     <input 
                         type="text"
                         value={searchQuery}
