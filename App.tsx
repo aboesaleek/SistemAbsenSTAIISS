@@ -5,10 +5,12 @@ import { AcademicDashboard } from './pages/AcademicDashboard';
 import { AppMode, AppRole } from './types';
 import { DormitoryDashboard } from './pages/DormitoryDashboard';
 import { supabase } from './supabaseClient';
+import { useAcademicPeriod } from './contexts/AcademicPeriodContext';
 
 function App() {
   const [loggedInRole, setLoggedInRole] = useState<AppMode | null>(null);
   const [loading, setLoading] = useState(true);
+  const { setAcademicPeriod } = useAcademicPeriod();
 
   useEffect(() => {
     // Function to check the session on initial load
@@ -27,6 +29,14 @@ function App() {
           if (!profile) throw new Error("Profil pengguna tidak ditemukan.");
           
           const lastMode = sessionStorage.getItem('appMode') as AppMode;
+          // Retrieve academic period from session storage
+          const lastYear = sessionStorage.getItem('academicYear');
+          const lastSemester = sessionStorage.getItem('semester');
+          
+          if (lastYear && lastSemester) {
+            setAcademicPeriod(lastYear, parseInt(lastSemester, 10));
+          }
+
           const userRole = profile.role as AppRole;
           let finalMode: AppMode | null = null;
           
@@ -51,11 +61,15 @@ function App() {
         } else {
           setLoggedInRole(null);
           sessionStorage.removeItem('appMode');
+          sessionStorage.removeItem('academicYear');
+          sessionStorage.removeItem('semester');
         }
       } catch (error: any) {
         console.error("Gagal memverifikasi sesi, keluar:", error.message);
         setLoggedInRole(null);
         sessionStorage.removeItem('appMode');
+        sessionStorage.removeItem('academicYear');
+        sessionStorage.removeItem('semester');
       } finally {
         // This is critical: ensure loading is set to false after the initial check.
         setLoading(false);
@@ -69,6 +83,8 @@ function App() {
       if (!session) {
         setLoggedInRole(null);
         sessionStorage.removeItem('appMode');
+        sessionStorage.removeItem('academicYear');
+        sessionStorage.removeItem('semester');
       }
     });
 
@@ -77,11 +93,9 @@ function App() {
     };
   }, []);
   
-  const handleLogin = (e: React.FormEvent, mode: AppMode) => {
-    e.preventDefault();
+  const handleLogin = (mode: AppMode, academicYear: string, semester: number) => {
     // This function is called from LoginPage AFTER a successful Supabase sign-in.
-    // The onAuthStateChange listener above will handle setting the state,
-    // but we set sessionStorage here to remember the user's chosen mode for subsequent visits.
+    setAcademicPeriod(academicYear, semester);
     sessionStorage.setItem('appMode', mode);
     setLoggedInRole(mode); // Set state immediately for a smooth transition.
   };

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Dormitory, Student, DormitoryPermission, DormitoryPrayerAbsence, DormitoryCeremonyAbsence, Prayer, CeremonyStatus, ceremonyStatusToLabel } from '../types';
+import { useAcademicPeriod } from './AcademicPeriodContext';
 
 interface DormitoryDataContextState {
   dormitories: Dormitory[];
@@ -21,9 +22,11 @@ export const DormitoryDataProvider: React.FC<{ children: React.ReactNode }> = ({
   const [permissionRecords, setPermissionRecords] = useState<DormitoryPermission[]>([]);
   const [prayerAbsences, setPrayerAbsences] = useState<DormitoryPrayerAbsence[]>([]);
   const [ceremonyAbsences, setCeremonyAbsences] = useState<DormitoryCeremonyAbsence[]>([]);
-
+  const { academicYear, semester, isReady } = useAcademicPeriod();
 
   const fetchData = useCallback(async () => {
+    if (!isReady) return; // Don't fetch until academic period is ready
+
     setLoading(true);
     try {
       const [
@@ -35,9 +38,9 @@ export const DormitoryDataProvider: React.FC<{ children: React.ReactNode }> = ({
       ] = await Promise.all([
         supabase.from('dormitories').select('*'),
         supabase.from('students').select('*').not('dormitory_id', 'is', null),
-        supabase.from('dormitory_permissions').select('*'),
-        supabase.from('dormitory_prayer_absences').select('*'),
-        supabase.from('dormitory_ceremony_absences').select('*'),
+        supabase.from('dormitory_permissions').select('*').eq('academic_year', academicYear).eq('semester', semester),
+        supabase.from('dormitory_prayer_absences').select('*').eq('academic_year', academicYear).eq('semester', semester),
+        supabase.from('dormitory_ceremony_absences').select('*').eq('academic_year', academicYear).eq('semester', semester),
       ]);
 
       if (dormsError || studentsError || permissionsError || prayerError || ceremonyError) {
@@ -89,7 +92,7 @@ export const DormitoryDataProvider: React.FC<{ children: React.ReactNode }> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [academicYear, semester, isReady]);
 
   useEffect(() => {
     fetchData();
@@ -101,7 +104,7 @@ export const DormitoryDataProvider: React.FC<{ children: React.ReactNode }> = ({
     permissionRecords,
     prayerAbsences,
     ceremonyAbsences,
-    loading,
+    loading: loading || !isReady, // Show loading if context isn't ready
     refetchData: fetchData,
   };
 

@@ -34,7 +34,7 @@ const AcademicDashboardContent: React.FC<AcademicDashboardProps> = ({ onLogout }
   const renderView = () => {
     switch (currentView) {
       case 'home':
-        return <AcademicHomeView navigateTo={setCurrentView} />;
+        return <AcademicHomeView navigateTo={setCurrentView} onStudentSelect={handleStudentSelectForRecap} />;
       case 'permissions':
         return <PermissionsView />;
       case 'attendance':
@@ -48,7 +48,7 @@ const AcademicDashboardContent: React.FC<AcademicDashboardProps> = ({ onLogout }
       case 'studentRecap':
         return <StudentRecapView preselectedStudentId={selectedStudentIdForRecap} />;
       default:
-        return <AcademicHomeView navigateTo={setCurrentView} />;
+        return <AcademicHomeView navigateTo={setCurrentView} onStudentSelect={handleStudentSelectForRecap} />;
     }
   };
 

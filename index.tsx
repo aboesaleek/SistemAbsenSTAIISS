@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { BackgroundProvider } from './contexts/BackgroundContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { AcademicPeriodProvider } from './contexts/AcademicPeriodContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,7 +15,9 @@ root.render(
   <React.StrictMode>
     <BackgroundProvider>
       <NotificationProvider>
-        <App />
+        <AcademicPeriodProvider>
+          <App />
+        </AcademicPeriodProvider>
       </NotificationProvider>
     </BackgroundProvider>
   </React.StrictMode>

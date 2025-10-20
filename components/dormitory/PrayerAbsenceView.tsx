@@ -4,6 +4,7 @@ import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAcademicPeriod } from '../../contexts/AcademicPeriodContext';
 
 const statusColorMap: { [key in CeremonyStatus]: { bg: string, text: string, border: string } } = {
   [CeremonyStatus.ALPHA]: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-500' },
@@ -76,6 +77,7 @@ interface PrayerAbsenceViewProps {
 export const PrayerAbsenceView: React.FC<PrayerAbsenceViewProps> = ({ onStudentSelect }) => {
     const { dormitories, students, prayerAbsences, loading, refetchData } = useDormitoryData();
     const { showNotification } = useNotification();
+    const { academicYear, semester } = useAcademicPeriod();
 
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
@@ -124,6 +126,8 @@ export const PrayerAbsenceView: React.FC<PrayerAbsenceViewProps> = ({ onStudentS
             date,
             prayer: selectedPrayer,
             status,
+            academic_year: academicYear,
+            semester: semester,
         }));
 
         const { error } = await supabase.from('dormitory_prayer_absences').insert(absenceData);

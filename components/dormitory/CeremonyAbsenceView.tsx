@@ -4,6 +4,7 @@ import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAcademicPeriod } from '../../contexts/AcademicPeriodContext';
 
 const statusColorMap: { [key in CeremonyStatus]: { bg: string, text: string, border: string } } = {
   [CeremonyStatus.ALPHA]: { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-500' },
@@ -68,6 +69,7 @@ interface CeremonyAbsenceViewProps {
 export const CeremonyAbsenceView: React.FC<CeremonyAbsenceViewProps> = ({ onStudentSelect }) => {
     const { dormitories, students, ceremonyAbsences, loading, refetchData } = useDormitoryData();
     const { showNotification } = useNotification();
+    const { academicYear, semester } = useAcademicPeriod();
 
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedDormitoryId, setSelectedDormitoryId] = useState('');
@@ -104,7 +106,13 @@ export const CeremonyAbsenceView: React.FC<CeremonyAbsenceViewProps> = ({ onStud
             return;
         }
         
-        const absenceData = Array.from(studentStatuses.entries()).map(([studentId, status]) => ({ student_id: studentId, date, status }));
+        const absenceData = Array.from(studentStatuses.entries()).map(([studentId, status]) => ({
+            student_id: studentId,
+            date,
+            status,
+            academic_year: academicYear,
+            semester: semester,
+        }));
         const { error } = await supabase.from('dormitory_ceremony_absences').insert(absenceData);
         if (error) {
             showNotification(`فشل حفظ الغياب: ${error.message}`, 'error');

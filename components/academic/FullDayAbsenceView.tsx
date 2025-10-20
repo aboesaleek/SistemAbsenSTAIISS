@@ -4,6 +4,7 @@ import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAcademicPeriod } from '../../contexts/AcademicPeriodContext';
 
 export const FullDayAbsenceView: React.FC = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -14,6 +15,7 @@ export const FullDayAbsenceView: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedCourseIds, setSelectedCourseIds] = useState<Set<string>>(new Set());
     const { showNotification } = useNotification();
+    const { academicYear, semester } = useAcademicPeriod();
 
     const { classes, students, courses, loading, refetchData } = useAcademicData();
     
@@ -80,6 +82,8 @@ export const FullDayAbsenceView: React.FC = () => {
                 student_id: selectedStudentId,
                 date,
                 course_id: courseId,
+                academic_year: academicYear,
+                semester: semester,
             }));
 
             const { error: insertError } = await supabase.from('academic_absences').insert(absenceData);

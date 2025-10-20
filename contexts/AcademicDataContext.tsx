@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Class, Student, Course, AttendanceRecord, RecapStatus } from '../types';
+import { useAcademicPeriod } from './AcademicPeriodContext';
 
 interface AcademicDataContextState {
   classes: Class[];
@@ -19,8 +20,11 @@ export const AcademicDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const { academicYear, semester, isReady } = useAcademicPeriod();
 
   const fetchData = useCallback(async () => {
+    if (!isReady) return; // Don't fetch until the academic period is loaded
+    
     setLoading(true);
     try {
       const [
@@ -33,8 +37,8 @@ export const AcademicDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         supabase.from('classes').select('*'),
         supabase.from('students').select('*').not('class_id', 'is', null),
         supabase.from('courses').select('*'),
-        supabase.from('academic_permissions').select('*'),
-        supabase.from('academic_absences').select('*'),
+        supabase.from('academic_permissions').select('*').eq('academic_year', academicYear).eq('semester', semester),
+        supabase.from('academic_absences').select('*').eq('academic_year', academicYear).eq('semester', semester),
       ]);
 
       if (classesError || studentsError || coursesError || permissionsError || absencesError) {
@@ -96,7 +100,7 @@ export const AcademicDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [academicYear, semester, isReady]);
 
   useEffect(() => {
     fetchData();
@@ -107,7 +111,7 @@ export const AcademicDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     students,
     courses,
     records,
-    loading,
+    loading: loading || !isReady, // Show loading if context isn't ready
     refetchData: fetchData,
   };
 

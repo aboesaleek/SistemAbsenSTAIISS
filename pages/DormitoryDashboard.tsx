@@ -38,7 +38,7 @@ const DormitoryDashboardContent: React.FC<DormitoryDashboardProps> = ({ onLogout
   const renderView = () => {
     switch (currentView) {
       case 'home':
-        return <DormitoryHomeView navigateTo={setCurrentView} />;
+        return <DormitoryHomeView navigateTo={setCurrentView} onStudentSelect={handleStudentSelectForRecap} />;
       case 'permissions':
         return <PermissionsView />;
       case 'absence':
@@ -50,7 +50,7 @@ const DormitoryDashboardContent: React.FC<DormitoryDashboardProps> = ({ onLogout
       case 'studentRecap':
         return <StudentRecapView preselectedStudentId={selectedStudentIdForRecap} />;
       default:
-        return <DormitoryHomeView navigateTo={setCurrentView} />;
+        return <DormitoryHomeView navigateTo={setCurrentView} onStudentSelect={handleStudentSelectForRecap} />;
     }
   };
 

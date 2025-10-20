@@ -13,6 +13,20 @@ const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, c
 const LOGIN_BACKGROUND_KEY = 'login_background_url';
 const BUCKET_NAME = 'public_assets';
 const FILE_NAME = 'login_background';
+const DEFAULT_YEAR_KEY = 'default_academic_year';
+const DEFAULT_SEMESTER_KEY = 'default_semester';
+
+
+// Helper to generate academic years
+const generateAcademicYears = () => {
+    const startYear = 2025;
+    const years = [];
+    for (let i = 0; i < 5; i++) {
+        const year = startYear + i;
+        years.push(`${year}-${year + 1}`);
+    }
+    return years;
+};
 
 export const SettingsView: React.FC = () => {
     const [currentBackgroundUrl, setCurrentBackgroundUrl] = useState('');
@@ -21,19 +35,23 @@ export const SettingsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const { showNotification } = useNotification();
+    const [defaultYear, setDefaultYear] = useState('');
+    const [defaultSemester, setDefaultSemester] = useState(1);
+    const [isSavingDefaults, setIsSavingDefaults] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const academicYears = generateAcademicYears();
     
     useEffect(() => {
-        const fetchCurrentBackground = async () => {
+        const fetchSettings = async () => {
             setLoading(true);
             const supabaseUrl = 'https://hzfzmoddonrwdlqxdwxs.supabase.co';
             const customBackgroundUrl = `${supabaseUrl}/storage/v1/object/public/${BUCKET_NAME}/${FILE_NAME}`;
             
             try {
+                // Fetch background setting
                 const urlWithCacheBust = `${customBackgroundUrl}?t=${new Date().getTime()}`;
                 const response = await fetch(urlWithCacheBust, { method: 'HEAD' });
-
                 if (response.ok) {
                     setCurrentBackgroundUrl(urlWithCacheBust);
                     setPreviewUrl(urlWithCacheBust);
@@ -41,14 +59,24 @@ export const SettingsView: React.FC = () => {
                     setCurrentBackgroundUrl('');
                     setPreviewUrl('');
                 }
+                 // Fetch default period settings
+                const { data: settingsData, error: settingsError } = await supabase.from('app_settings').select('key, value');
+                if (settingsError) throw settingsError;
+
+                const yearSetting = settingsData.find(s => s.key === DEFAULT_YEAR_KEY);
+                const semesterSetting = settingsData.find(s => s.key === DEFAULT_SEMESTER_KEY);
+                
+                if (yearSetting) setDefaultYear(yearSetting.value);
+                if (semesterSetting) setDefaultSemester(parseInt(semesterSetting.value, 10));
+
             } catch (error: any) {
-                showNotification(`فشل في جلب الخلفية الحالية: ${error.message}`, 'error');
+                showNotification(`فشل في جلب الإعدادات: ${error.message}`, 'error');
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchCurrentBackground();
+        fetchSettings();
     }, []);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,10 +141,54 @@ export const SettingsView: React.FC = () => {
         }
     };
 
+    const handleSaveDefaults = async () => {
+        setIsSavingDefaults(true);
+        try {
+            const { error } = await supabase.from('app_settings').upsert([
+                { key: DEFAULT_YEAR_KEY, value: defaultYear },
+                { key: DEFAULT_SEMESTER_KEY, value: defaultSemester.toString() }
+            ]);
+
+            if (error) throw error;
+            showNotification('تم حفظ الإعدادات الافتراضية بنجاح.', 'success');
+        } catch (error: any) {
+            showNotification(`فشل في حفظ الإعدادات: ${error.message}`, 'error');
+        } finally {
+            setIsSavingDefaults(false);
+        }
+    };
+
+
     return (
         <div className="space-y-6">
-            <h2 className="text-3xl font-bold text-slate-800">إعدادات المظهر</h2>
+            <h2 className="text-3xl font-bold text-slate-800">الإعدادات</h2>
             
+             <Card title="إعدادات العام الدراسي الافتراضي">
+                 {loading ? <div className="text-center">...جاري تحميل الإعدادات</div> : (
+                    <div className="space-y-4">
+                        <p className="text-sm text-slate-500">اختر العام الدراسي والفصل الدراسي الذي سيظهر بشكل افتراضي في صفحة تسجيل الدخول لجميع المستخدمين.</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">العام الدراسي</label>
+                                <select value={defaultYear} onChange={(e) => setDefaultYear(e.target.value)} className="w-full p-2 border rounded-md bg-white">
+                                    {academicYears.map(year => <option key={year} value={year}>{year}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">الفصل الدراسي</label>
+                                <select value={defaultSemester} onChange={(e) => setDefaultSemester(Number(e.target.value))} className="w-full p-2 border rounded-md bg-white">
+                                    <option value={1}>الفصل الدراسي 1</option>
+                                    <option value={2}>الفصل الدراسي 2</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button onClick={handleSaveDefaults} disabled={isSavingDefaults} className="w-full sm:w-auto mt-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50">
+                            {isSavingDefaults ? '...جاري الحفظ' : 'حفظ الإعدادات'}
+                        </button>
+                    </div>
+                )}
+            </Card>
+
             <Card title="خلفية صفحة تسجيل الدخول">
                 <div className="space-y-4">
                     <p className="text-sm text-slate-500">

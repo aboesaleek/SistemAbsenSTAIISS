@@ -5,6 +5,7 @@ import { supabase } from '../../supabaseClient';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { FullDayAbsenceView } from './FullDayAbsenceView';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAcademicPeriod } from '../../contexts/AcademicPeriodContext';
 
 const statusColorMap: { [key in RecapStatus]: string } = {
   [RecapStatus.ABSENT]: 'bg-red-100 text-red-800',
@@ -83,6 +84,7 @@ interface AttendanceViewProps {
 export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect }) => {
     const { classes, students, courses, records, loading, refetchData } = useAcademicData();
     const { showNotification } = useNotification();
+    const { academicYear, semester } = useAcademicPeriod();
 
     // Common state for daily tab
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -154,6 +156,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({ onStudentSelect 
             student_id: studentId,
             date,
             course_id: selectedCourseId,
+            academic_year: academicYear,
+            semester: semester,
         }));
 
         const { error } = await supabase.from('academic_absences').insert(absenceData);

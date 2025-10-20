@@ -4,6 +4,7 @@ import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useAcademicData } from '../../contexts/AcademicDataContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAcademicPeriod } from '../../contexts/AcademicPeriodContext';
 
 export const PermissionsView: React.FC = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -14,6 +15,7 @@ export const PermissionsView: React.FC = () => {
     const [reason, setReason] = useState('');
     const [showSearchResults, setShowSearchResults] = useState(false);
     const { showNotification } = useNotification();
+    const { academicYear, semester } = useAcademicPeriod();
 
     const { classes, students, loading, refetchData } = useAcademicData();
     
@@ -54,6 +56,8 @@ export const PermissionsView: React.FC = () => {
             date,
             type: permissionType,
             reason, // Sertakan alasan
+            academic_year: academicYear,
+            semester: semester,
         });
 
         if (error) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../supabaseClient';
 import { AdminViewType } from '../../pages/AdminDashboard';
 import { AcademicIcon } from '../icons/AcademicIcon';
@@ -6,12 +6,11 @@ import { DormitoryIcon } from '../icons/DormitoryIcon';
 import { UsersIcon } from '../icons/UsersIcon';
 import { CheckCircleIcon } from '../icons/CheckCircleIcon';
 import { ClipboardListIcon } from '../icons/ClipboardListIcon';
-import { UserIcon } from '../icons/UserIcon';
 import { PermissionIcon } from '../icons/PermissionIcon';
-import { TrendingUpIcon } from '../icons/TrendingUpIcon';
-import { ChartCard } from '../shared/ChartCard';
-
-declare const Chart: any; // Mendeklarasikan Chart dari global scope untuk TypeScript
+import { AlertTriangleIcon } from '../icons/AlertTriangleIcon';
+import { BellIcon } from '../icons/BellIcon';
+import { useAcademicPeriod } from '../../contexts/AcademicPeriodContext';
+import { SettingsIcon } from '../icons/SettingsIcon';
 
 // Local interface for unified activity log
 interface ActivityLog {
@@ -21,70 +20,11 @@ interface ActivityLog {
   icon: React.ReactNode;
 }
 
-// Chart Component
-const DailyActivityChart: React.FC<{ chartData: any, loading: boolean }> = ({ chartData, loading }) => {
-    const chartRef = useRef<HTMLCanvasElement>(null);
-    const chartInstanceRef = useRef<any>(null);
-
-    useEffect(() => {
-        if (chartRef.current && chartData) {
-            if (chartInstanceRef.current) {
-                chartInstanceRef.current.destroy();
-            }
-
-            const ctx = chartRef.current.getContext('2d');
-            if (ctx) {
-                chartInstanceRef.current = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: chartData.labels,
-                        datasets: [
-                            {
-                                label: 'الأكاديمية',
-                                data: chartData.academicData,
-                                borderColor: 'rgba(20, 184, 166, 1)',
-                                backgroundColor: 'rgba(20, 184, 166, 0.2)',
-                                fill: true,
-                                tension: 0.3,
-                            },
-                            {
-                                label: 'المهجع',
-                                data: chartData.dormitoryData,
-                                borderColor: 'rgba(168, 85, 247, 1)',
-                                backgroundColor: 'rgba(168, 85, 247, 0.2)',
-                                fill: true,
-                                tension: 0.3,
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            title: { display: false },
-                            legend: { position: 'top', labels: { font: { family: 'Cairo' } } },
-                        },
-                        scales: {
-                            y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } },
-                            x: { ticks: { font: { family: 'Cairo' } } }
-                        }
-                    }
-                });
-            }
-        }
-        return () => {
-            if (chartInstanceRef.current) {
-                chartInstanceRef.current.destroy();
-            }
-        };
-    }, [chartData]);
-    
-    if (loading) {
-        return <div className="text-center py-10 text-slate-500">...جاري تحميل بيانات الرسم البياني</div>;
-    }
-
-    return <canvas ref={chartRef}></canvas>;
-};
+interface HighAbsenceStudent {
+    studentId: string;
+    name: string;
+    count: number;
+}
 
 // Helper to format relative time
 const formatTimeAgo = (dateString: string) => {
@@ -115,199 +55,186 @@ interface AdminHomeViewProps {
 const ModuleCard: React.FC<{
     icon: React.ReactNode;
     title: string;
-    description: string;
     onClick: () => void;
-}> = ({ icon, title, description, onClick }) => (
-    <button onClick={onClick} className="w-full text-right bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200 hover:shadow-lg hover:border-teal-400 transition-all duration-300 transform hover:-translate-y-1 flex items-start gap-4">
-        <div className="bg-teal-100 text-teal-600 rounded-lg p-4">
-            {icon}
-        </div>
-        <div>
+    color: string;
+}> = ({ icon, title, onClick, color }) => (
+    <button onClick={onClick} className={`w-full text-right bg-white p-6 rounded-2xl shadow-lg border-t-4 ${color} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between h-full`}>
+        <div className="flex items-center gap-4">
+            <div className="bg-slate-100 rounded-lg p-3">
+                {icon}
+            </div>
             <h3 className="text-xl font-bold text-slate-800">{title}</h3>
-            <p className="text-slate-500 mt-1">{description}</p>
         </div>
+        <p className="text-teal-600 font-semibold mt-4 text-left">إدارة الآن &rarr;</p>
     </button>
 );
 
 const StatCard: React.FC<{ title: string; value: number | string; icon: React.ReactNode; }> = ({ title, value, icon }) => (
-    <div className="bg-white p-3 sm:p-4 rounded-xl shadow-md border border-slate-200 flex items-center gap-3 sm:gap-4">
-        <div className="flex-shrink-0 bg-slate-100 rounded-full p-2 sm:p-3">
+    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 flex items-center gap-4">
+        <div className="flex-shrink-0 text-slate-500">
             {icon}
         </div>
         <div>
-            <p className="text-slate-500 text-xs sm:text-sm font-semibold">{title}</p>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-800">{value}</p>
+            <p className="text-slate-500 text-sm font-semibold">{title}</p>
+            <p className="text-3xl font-bold text-slate-800">{value}</p>
         </div>
     </div>
 );
 
 export const AdminHomeView: React.FC<AdminHomeViewProps> = ({ setCurrentView }) => {
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-    const [stats, setStats] = useState({
-        academicPermissions: 0,
-        academicAbsences: 0,
-        dormPermissions: 0,
-        dormAbsences: 0,
-    });
-    const [chartData, setChartData] = useState(null);
-    const [loadingLogs, setLoadingLogs] = useState(true);
-    const [loadingStats, setLoadingStats] = useState(true);
-    const [loadingChart, setLoadingChart] = useState(true);
+    const [highAbsenceStudents, setHighAbsenceStudents] = useState<HighAbsenceStudent[]>([]);
+    const [stats, setStats] = useState({ academicPermissions: 0, academicAbsences: 0, dormPermissions: 0, dormAbsences: 0 });
+    const [loading, setLoading] = useState(true);
+    const { academicYear, semester, isReady } = useAcademicPeriod();
     
     useEffect(() => {
-        const fetchAllData = async () => {
-            const today = new Date().toISOString().split('T')[0];
-            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-            const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        if (!isReady) return;
 
+        const fetchAllData = async () => {
+            setLoading(true);
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            
             try {
-                // Fetch data for all sections
+                // Fetch stats and logs in parallel
                 const [
-                    // Logs
-                    academicPermissionsLogs, academicAbsencesLogs, dormPermissionsLogs,
-                    dormPrayerAbsencesLogs, dormCeremonyAbsencesLogs, newUsersLogs,
                     // Stats
                     acPermCount, acAbsCount, dormPermCount,
                     dormPrayerAbsCount, dormCeremonyAbsCount,
-                    // Chart
-                    academicPermissionsChart, academicAbsencesChart, dormPermissionsChart,
-                    dormPrayerAbsencesChart, dormCeremonyAbsencesChart
+                    // High Absence
+                    absenceCounts,
+                    // Logs
+                    academicPermissionsLogs, academicAbsencesLogs, dormPermissionsLogs,
                 ] = await Promise.all([
-                    // Logs promises
+                    supabase.from('academic_permissions').select('*', { count: 'exact', head: true }).eq('academic_year', academicYear).eq('semester', semester),
+                    supabase.from('academic_absences').select('*', { count: 'exact', head: true }).eq('academic_year', academicYear).eq('semester', semester),
+                    supabase.from('dormitory_permissions').select('*', { count: 'exact', head: true }).eq('academic_year', academicYear).eq('semester', semester),
+                    supabase.from('dormitory_prayer_absences').select('*', { count: 'exact', head: true }).eq('academic_year', academicYear).eq('semester', semester),
+                    supabase.from('dormitory_ceremony_absences').select('*', { count: 'exact', head: true }).eq('academic_year', academicYear).eq('semester', semester),
+                    supabase.from('academic_absences').select('student_id, students(name)').eq('academic_year', academicYear).eq('semester', semester),
                     supabase.from('academic_permissions').select('id, created_at, students(name)').gte('created_at', twentyFourHoursAgo),
-                    supabase.from('academic_absences').select('id, created_at, students(name), courses(name)').gte('created_at', twentyFourHoursAgo),
-                    supabase.from('dormitory_permissions').select('id, created_at, type, students(name)').gte('created_at', twentyFourHoursAgo),
-                    supabase.from('dormitory_prayer_absences').select('id, created_at, prayer, students(name)').gte('created_at', twentyFourHoursAgo),
-                    supabase.from('dormitory_ceremony_absences').select('id, created_at, students(name)').gte('created_at', twentyFourHoursAgo),
-                    supabase.from('profiles').select('id, created_at, username, role').gte('created_at', twentyFourHoursAgo),
-                    // Stats promises
-                    supabase.from('academic_permissions').select('*', { count: 'exact', head: true }).eq('date', today),
-                    supabase.from('academic_absences').select('*', { count: 'exact', head: true }).eq('date', today),
-                    supabase.from('dormitory_permissions').select('*', { count: 'exact', head: true }).eq('date', today),
-                    supabase.from('dormitory_prayer_absences').select('*', { count: 'exact', head: true }).eq('date', today),
-                    supabase.from('dormitory_ceremony_absences').select('*', { count: 'exact', head: true }).eq('date', today),
-                    // Chart promises
-                    supabase.from('academic_permissions').select('id, date').gte('date', fourteenDaysAgo),
-                    supabase.from('academic_absences').select('id, date').gte('date', fourteenDaysAgo),
-                    supabase.from('dormitory_permissions').select('id, date').gte('date', fourteenDaysAgo),
-                    supabase.from('dormitory_prayer_absences').select('id, date').gte('date', fourteenDaysAgo),
-                    supabase.from('dormitory_ceremony_absences').select('id, date').gte('date', fourteenDaysAgo),
+                    supabase.from('academic_absences').select('id, created_at, students(name)').gte('created_at', twentyFourHoursAgo),
+                    supabase.from('dormitory_permissions').select('id, created_at, students(name)').gte('created_at', twentyFourHoursAgo),
                 ]);
 
-                // Process logs
-                const combinedLogs: ActivityLog[] = [];
-                academicPermissionsLogs.data?.forEach((item: any) => item.students && combinedLogs.push({ id: `ap-${item.id}`, timestamp: item.created_at, description: <>إذن أكاديمي جديد للطالب: <b>{item.students.name}</b></>, icon: <CheckCircleIcon className="w-5 h-5 text-blue-500" /> }));
-                academicAbsencesLogs.data?.forEach((item: any) => item.students && item.courses && combinedLogs.push({ id: `aa-${item.id}`, timestamp: item.created_at, description: <>غياب أكاديمي جديد للطالب: <b>{item.students.name}</b> في مادة {item.courses.name}</>, icon: <ClipboardListIcon className="w-5 h-5 text-red-500" /> }));
-                dormPermissionsLogs.data?.forEach((item: any) => item.students && combinedLogs.push({ id: `dp-${item.id}`, timestamp: item.created_at, description: <>إذن مهجع جديد ({item.type}) للطالب: <b>{item.students.name}</b></>, icon: <PermissionIcon className="w-5 h-5 text-purple-500" /> }));
-                dormPrayerAbsencesLogs.data?.forEach((item: any) => item.students && combinedLogs.push({ id: `dpa-${item.id}`, timestamp: item.created_at, description: <>غياب صلاة ({item.prayer}) للطالب: <b>{item.students.name}</b></>, icon: <ClipboardListIcon className="w-5 h-5 text-orange-500" /> }));
-                dormCeremonyAbsencesLogs.data?.forEach((item: any) => item.students && combinedLogs.push({ id: `dca-${item.id}`, timestamp: item.created_at, description: <>غياب مراسم للطالب: <b>{item.students.name}</b></>, icon: <ClipboardListIcon className="w-5 h-5 text-yellow-500" /> }));
-                newUsersLogs.data?.forEach((item: any) => combinedLogs.push({ id: `nu-${item.id}`, timestamp: item.created_at, description: <>مستخدم جديد تمت إضافته: <b>{item.username}</b> بدور {item.role}</>, icon: <UserIcon className="w-5 h-5 text-green-500" /> }));
-                combinedLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-                setActivityLogs(combinedLogs);
-                setLoadingLogs(false);
-
-                // Process stats
-                setStats({ academicPermissions: acPermCount.count || 0, academicAbsences: acAbsCount.count || 0, dormPermissions: dormPermCount.count || 0, dormAbsences: (dormPrayerAbsCount.count || 0) + (dormCeremonyAbsCount.count || 0) });
-                setLoadingStats(false);
-                
-                // Process Chart Data
-                const activityByDate = new Map<string, { academic: number, dormitory: number }>();
-                for (let i = 13; i >= 0; i--) {
-                    const date = new Date();
-                    date.setDate(date.getDate() - i);
-                    activityByDate.set(date.toISOString().split('T')[0], { academic: 0, dormitory: 0 });
-                }
-                academicPermissionsChart.data?.forEach((r: any) => { if (activityByDate.has(r.date)) activityByDate.get(r.date)!.academic++; });
-                academicAbsencesChart.data?.forEach((r: any) => { if (activityByDate.has(r.date)) activityByDate.get(r.date)!.academic++; });
-                dormPermissionsChart.data?.forEach((r: any) => { if (activityByDate.has(r.date)) activityByDate.get(r.date)!.dormitory++; });
-                dormPrayerAbsencesChart.data?.forEach((r: any) => { if (activityByDate.has(r.date)) activityByDate.get(r.date)!.dormitory++; });
-                dormCeremonyAbsencesChart.data?.forEach((r: any) => { if (activityByDate.has(r.date)) activityByDate.get(r.date)!.dormitory++; });
-                
-                setChartData({
-                    labels: Array.from(activityByDate.keys()).map(d => new Date(d).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' })),
-                    academicData: Array.from(activityByDate.values()).map(v => v.academic),
-                    dormitoryData: Array.from(activityByDate.values()).map(v => v.dormitory),
+                // Process Stats
+                setStats({
+                    academicPermissions: acPermCount.count || 0,
+                    academicAbsences: acAbsCount.count || 0,
+                    dormPermissions: dormPermCount.count || 0,
+                    dormAbsences: (dormPrayerAbsCount.count || 0) + (dormCeremonyAbsCount.count || 0)
                 });
-                setLoadingChart(false);
+
+                // Process High Absence Students
+                const studentAbsenceMap = new Map<string, { studentId: string; name: string, count: number }>();
+                (absenceCounts.data || []).forEach((record: any) => {
+                    if (record.students) {
+                        const existing = studentAbsenceMap.get(record.student_id);
+                        if (existing) {
+                            existing.count += 1;
+                        } else {
+                            studentAbsenceMap.set(record.student_id, { studentId: record.student_id, name: record.students.name, count: 1 });
+                        }
+                    }
+                });
+                const highAbsences = Array.from(studentAbsenceMap.values()).filter(s => s.count > 5).sort((a, b) => b.count - a.count);
+                setHighAbsenceStudents(highAbsences);
+
+                // Process Logs
+                const combinedLogs: ActivityLog[] = [];
+                academicPermissionsLogs.data?.forEach((item: any) => item.students && combinedLogs.push({ id: `ap-${item.id}`, timestamp: item.created_at, description: <>إذن أكاديمي لـ <b>{item.students.name}</b></>, icon: <CheckCircleIcon className="w-5 h-5 text-blue-500" /> }));
+                academicAbsencesLogs.data?.forEach((item: any) => item.students && combinedLogs.push({ id: `aa-${item.id}`, timestamp: item.created_at, description: <>غياب أكاديمي لـ <b>{item.students.name}</b></>, icon: <ClipboardListIcon className="w-5 h-5 text-red-500" /> }));
+                dormPermissionsLogs.data?.forEach((item: any) => item.students && combinedLogs.push({ id: `dp-${item.id}`, timestamp: item.created_at, description: <>إذن مهجع لـ <b>{item.students.name}</b></>, icon: <PermissionIcon className="w-5 h-5 text-purple-500" /> }));
+                combinedLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                setActivityLogs(combinedLogs.slice(0, 10));
 
             } catch (error: any) {
                 console.error("Gagal mengambil data dasbor:", error.message);
-                setLoadingLogs(false);
-                setLoadingStats(false);
-                setLoadingChart(false);
+            } finally {
+                setLoading(false);
             }
         };
 
         fetchAllData();
-    }, []);
+    }, [isReady, academicYear, semester]);
 
     return (
         <div className="space-y-6">
             <h2 className="text-3xl font-bold text-slate-800">الرئيسية</h2>
             
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
-                <div className="flex items-center gap-3 mb-4">
-                    <TrendingUpIcon className="w-6 h-6 text-slate-600" />
-                    <h3 className="text-xl font-bold text-slate-700">إحصائيات اليوم</h3>
+            {loading ? <div className="text-center py-4 text-slate-500">...جاري تحميل الإحصائيات</div> : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatCard title="إذن أكاديمي" value={stats.academicPermissions} icon={<CheckCircleIcon className="w-6 h-6" />} />
+                    <StatCard title="غياب أكاديمي" value={stats.academicAbsences} icon={<ClipboardListIcon className="w-6 h-6" />} />
+                    <StatCard title="إذن المهجع" value={stats.dormPermissions} icon={<PermissionIcon className="w-6 h-6" />} />
+                    <StatCard title="غياب المهجع" value={stats.dormAbsences} icon={<ClipboardListIcon className="w-6 h-6" />} />
                 </div>
-                {loadingStats ? <div className="text-center py-4 text-slate-500">...جاري تحميل الإحصائيات</div> : (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                    <StatCard title="إذن أكاديمي" value={stats.academicPermissions} icon={<CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />} />
-                    <StatCard title="غياب أكاديمي" value={stats.academicAbsences} icon={<ClipboardListIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />} />
-                    <StatCard title="إذن المهجع" value={stats.dormPermissions} icon={<PermissionIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500" />} />
-                    <StatCard title="غياب المهجع" value={stats.dormAbsences} icon={<ClipboardListIcon className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />} />
-                </div>
-                )}
-            </div>
-
-            <ChartCard title="مقارنة الأنشطة اليومية (آخر 14 يومًا)">
-                 <DailyActivityChart chartData={chartData} loading={loadingChart} />
-            </ChartCard>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <ModuleCard 
-                    icon={<AcademicIcon className="w-8 h-8"/>}
-                    title="إدارة الشؤون الأكاديمية"
-                    description="إدارة الفصول والطلاب والمواد الدراسية."
-                    onClick={() => setCurrentView('academic')}
-                />
-                 <ModuleCard 
-                    icon={<DormitoryIcon className="w-8 h-8"/>}
-                    title="إدارة شؤون المهجع"
-                    description="إدارة المهاجع والطلاب المقيمين فيها."
-                    onClick={() => setCurrentView('dormitory')}
-                />
-                 <ModuleCard 
-                    icon={<UsersIcon className="w-8 h-8"/>}
-                    title="إدارة المستخدمين"
-                    description="إضافة وتعديل حسابات المستخدمين."
-                    onClick={() => setCurrentView('users')}
-                />
-            </div>
+            )}
             
-             <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
-                <h3 className="text-xl font-bold text-slate-700 mb-4">الأنشطة الأخيرة (آخر 24 ساعة)</h3>
-                {loadingLogs ? (
-                    <div className="text-center py-8 text-slate-500">...جاري تحميل الأنشطة</div>
-                ) : activityLogs.length > 0 ? (
-                    <div className="space-y-4 max-h-96 overflow-y-auto pr-2 sm:pr-4">
-                       {activityLogs.map(log => (
-                           <div key={log.id} className="flex items-start gap-4">
-                                <div className="flex-shrink-0 bg-slate-100 rounded-full p-2 mt-1">
-                                    {log.icon}
-                                </div>
-                                <div className="flex-grow">
-                                    <p className="text-slate-700 text-sm">{log.description}</p>
-                                    <p className="text-xs text-slate-400">{formatTimeAgo(log.timestamp)}</p>
-                                </div>
-                           </div>
-                       ))}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <ModuleCard 
+                        icon={<AcademicIcon className="w-8 h-8 text-teal-600"/>}
+                        title="الشؤون الأكاديمية"
+                        onClick={() => setCurrentView('academic')}
+                        color="border-teal-500"
+                    />
+                     <ModuleCard 
+                        icon={<DormitoryIcon className="w-8 h-8 text-purple-600"/>}
+                        title="شؤون المهجع"
+                        onClick={() => setCurrentView('dormitory')}
+                        color="border-purple-500"
+                    />
+                     <ModuleCard 
+                        icon={<UsersIcon className="w-8 h-8 text-sky-600"/>}
+                        title="إدارة المستخدمين"
+                        onClick={() => setCurrentView('users')}
+                        color="border-sky-500"
+                    />
+                    <ModuleCard 
+                        icon={<SettingsIcon className="w-8 h-8 text-slate-600"/>}
+                        title="الإعدادات"
+                        onClick={() => setCurrentView('settings')}
+                        color="border-slate-500"
+                    />
+                </div>
+                
+                <div className="space-y-6">
+                    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200 h-full">
+                        <h3 className="text-xl font-bold text-slate-700 mb-4 flex items-center gap-2"><AlertTriangleIcon className="w-6 h-6 text-red-500"/> تنبيهات الغياب</h3>
+                        {loading ? <div className="text-center py-8 text-slate-500">...</div> : highAbsenceStudents.length > 0 ? (
+                            <ul className="space-y-3 max-h-48 overflow-y-auto pr-2">
+                               {highAbsenceStudents.map(student => (
+                                   <li key={student.studentId} className="flex justify-between items-center text-sm">
+                                       <span className="font-semibold text-slate-600">{student.name}</span>
+                                       <span className="font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">{student.count} غيابات</span>
+                                   </li>
+                               ))}
+                            </ul>
+                        ) : (
+                            <div className="text-center py-8 text-slate-500">لا توجد تنبيهات.</div>
+                        )}
                     </div>
-                ) : (
-                    <div className="text-center py-8 text-slate-500">
-                        لا توجد أنشطة في آخر 24 ساعة.
+
+                    <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
+                        <h3 className="text-xl font-bold text-slate-700 mb-4 flex items-center gap-2"><BellIcon className="w-6 h-6 text-teal-500"/> الأنشطة الأخيرة</h3>
+                        {loading ? <div className="text-center py-8 text-slate-500">...</div> : activityLogs.length > 0 ? (
+                            <div className="space-y-4 max-h-48 overflow-y-auto pr-2">
+                               {activityLogs.map(log => (
+                                   <div key={log.id} className="flex items-start gap-3">
+                                        <div className="flex-shrink-0 bg-slate-100 rounded-full p-2 mt-1">{log.icon}</div>
+                                        <div>
+                                            <p className="text-slate-700 text-sm">{log.description}</p>
+                                            <p className="text-xs text-slate-400">{formatTimeAgo(log.timestamp)}</p>
+                                        </div>
+                                   </div>
+                               ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-slate-500">لا توجد أنشطة.</div>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );

@@ -4,11 +4,13 @@ import { CalendarIcon } from '../icons/CalendarIcon';
 import { supabase } from '../../supabaseClient';
 import { useDormitoryData } from '../../contexts/DormitoryDataContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAcademicPeriod } from '../../contexts/AcademicPeriodContext';
 
 
 export const PermissionsView: React.FC = () => {
     const { dormitories, students, loading, refetchData } = useDormitoryData();
     const { showNotification } = useNotification();
+    const { academicYear, semester } = useAcademicPeriod();
 
     const [permissionType, setPermissionType] = useState<DormitoryPermissionType>(DormitoryPermissionType.GENERAL_LEAVE);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -118,6 +120,8 @@ export const PermissionsView: React.FC = () => {
             type: permissionType,
             number_of_days: numberOfDays,
             reason,
+            academic_year: academicYear,
+            semester: semester,
         }));
 
         const { error } = await supabase.from('dormitory_permissions').insert(permissionsToInsert);
