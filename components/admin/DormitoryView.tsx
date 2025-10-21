@@ -7,6 +7,8 @@ import { supabase } from '../../supabaseClient';
 import { Pagination } from '../shared/Pagination';
 import { useNotification } from '../../contexts/NotificationContext';
 import { ConfirmationDialog } from '../shared/ConfirmationDialog';
+import { CheckIcon } from '../icons/CheckIcon';
+import { CancelIcon } from '../icons/CancelIcon';
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md border border-slate-200">
@@ -38,6 +40,8 @@ export const DormitoryView: React.FC = () => {
     const [confirmDelete, setConfirmDelete] = useState<{ id: string | number, tableName: string } | null>(null);
     const { showNotification } = useNotification();
     
+    const [editingItem, setEditingItem] = useState<{ id: string; name: string; dormitory_id?: string } | null>(null);
+
     // State for pagination and search
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -50,6 +54,7 @@ export const DormitoryView: React.FC = () => {
     useEffect(() => {
         setSearchQuery('');
         setCurrentPage(1);
+        setEditingItem(null); // Cancel edit on tab change
     }, [activeTab]);
 
     const { filteredItems, paginatedItems } = useMemo(() => {
@@ -143,57 +148,51 @@ export const DormitoryView: React.FC = () => {
             fetchData(); // Refresh data
         }
     };
-    
-     const renderTable = () => {
-        let headers: string[] = [];
-        let data: (string | number)[][] = [];
 
-        if (activeTab === 'dormitories') {
-            headers = ['اسم المهجع'];
-            data = paginatedItems.map(d => [d.name]);
-        } else if (activeTab === 'students') {
-            headers = ['اسم الطالب', 'المهجع'];
-            data = (paginatedItems as Student[]).map(s => [s.name, dormitories.find(d => d.id === s.dormitory_id)?.name || 'N/A']);
+    const handleEdit = (item: Dormitory | Student) => {
+        if ('dormitory_id' in item) {
+            setEditingItem({ id: item.id, name: item.name, dormitory_id: item.dormitory_id });
+        } else {
+            setEditingItem({ id: item.id, name: item.name });
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingItem(null);
+    };
+
+    const handleUpdate = async () => {
+        if (!editingItem) return;
+        
+        const { id, name, dormitory_id } = editingItem;
+        if (!name.trim()) {
+            showNotification('لا يمكن أن يكون الاسم فارغًا.', 'error');
+            return;
+        }
+
+        let dataToUpdate: { name: string; dormitory_id?: string } = { name: name.trim() };
+        if (dormitory_id !== undefined) {
+            dataToUpdate.dormitory_id = dormitory_id;
         }
         
-        return (
-             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right text-slate-600">
-                    <thead className="text-xs text-slate-700 uppercase bg-slate-100">
-                        <tr>
-                            {headers.map(h => <th key={h} className="px-2 py-3 sm:px-6 whitespace-nowrap">{h}</th>)}
-                            <th className="px-2 py-3 sm:px-6 whitespace-nowrap">إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {data.length === 0 ? (
-                            <tr>
-                                <td colSpan={headers.length + 1} className="text-center py-8 text-slate-500">
-                                    لا توجد بيانات متاحة.
-                                </td>
-                            </tr>
-                        ) : (
-                            data.map((row, rowIndex) => (
-                                <tr key={paginatedItems[rowIndex].id} className="bg-white border-b hover:bg-slate-50">
-                                    {row.map((cell, cellIndex) => <td key={cellIndex} className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{cell}</td>)}
-                                    <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
-                                        <div className="flex gap-3 justify-end">
-                                            <button disabled className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
-                                                <EditIcon className="w-5 h-5" />
-                                            </button>
-                                            <button onClick={() => requestDelete(paginatedItems[rowIndex].id, activeTab)} className="text-red-600 hover:text-red-800">
-                                                <DeleteIcon className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        );
-    }
+        const { error } = await supabase
+            .from(activeTab)
+            .update(dataToUpdate)
+            .eq('id', id);
+
+        if (error) {
+            showNotification(`فشل في التحديث: ${error.message}`, 'error');
+        } else {
+            showNotification('تم تحديث العنصر بنجاح.', 'success');
+            setEditingItem(null);
+            fetchData();
+        }
+    };
+    
+    const headers = {
+        dormitories: ['اسم المهجع'],
+        students: ['اسم الطالب', 'المهجع'],
+    };
 
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
@@ -259,7 +258,75 @@ export const DormitoryView: React.FC = () => {
                         placeholder={`بحث في ${activeTab}...`}
                         className="w-full md:w-1/3 p-2 border rounded-md mb-4"
                     />
-                    {renderTable()}
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-right text-slate-600">
+                            <thead className="text-xs text-slate-700 uppercase bg-slate-100">
+                                <tr>
+                                    {headers[activeTab].map(h => <th key={h} className="px-2 py-3 sm:px-6 whitespace-nowrap">{h}</th>)}
+                                    <th className="px-2 py-3 sm:px-6 whitespace-nowrap">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedItems.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={headers[activeTab].length + 1} className="text-center py-8 text-slate-500">
+                                            لا توجد بيانات متاحة.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paginatedItems.map(item => {
+                                        const isEditing = editingItem?.id === item.id;
+                                        return (
+                                            <tr key={item.id} className="bg-white border-b hover:bg-slate-50">
+                                                <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                    {isEditing ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editingItem.name}
+                                                            onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                                                            className="w-full p-1 border rounded"
+                                                        />
+                                                    ) : (
+                                                        item.name
+                                                    )}
+                                                </td>
+                                                {activeTab === 'students' && (
+                                                    <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                        {isEditing ? (
+                                                            <select
+                                                                value={editingItem.dormitory_id}
+                                                                onChange={(e) => setEditingItem({ ...editingItem, dormitory_id: e.target.value })}
+                                                                className="w-full p-1 border rounded bg-white"
+                                                            >
+                                                                {dormitories.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                            </select>
+                                                        ) : (
+                                                            dormitories.find(d => d.id === (item as Student).dormitory_id)?.name || 'N/A'
+                                                        )}
+                                                    </td>
+                                                )}
+                                                <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                    <div className="flex gap-3 justify-end">
+                                                        {isEditing ? (
+                                                            <>
+                                                                <button onClick={handleUpdate} className="text-green-600 hover:text-green-800" title="حفظ"><CheckIcon className="w-5 h-5" /></button>
+                                                                <button onClick={handleCancelEdit} className="text-red-600 hover:text-red-800" title="إلغاء"><CancelIcon className="w-5 h-5" /></button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <button onClick={() => handleEdit(item)} className="text-blue-600 hover:text-blue-800" title="تعديل"><EditIcon className="w-5 h-5" /></button>
+                                                                <button onClick={() => requestDelete(item.id, activeTab)} className="text-red-600 hover:text-red-800" title="حذف"><DeleteIcon className="w-5 h-5" /></button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                     <Pagination
                         currentPage={currentPage}
                         totalItems={filteredItems.length}

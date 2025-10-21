@@ -17,7 +17,34 @@ export const PermissionsView: React.FC = () => {
     const { showNotification } = useNotification();
     const { academicYear, semester } = useAcademicPeriod();
 
-    const { classes, students, loading, refetchData } = useAcademicData();
+    const { classes, students, records, loading, refetchData } = useAcademicData();
+
+    const [nonAttendanceDays, setNonAttendanceDays] = useState<number | null>(null);
+    
+    useEffect(() => {
+        if (!selectedStudentId) {
+            setNonAttendanceDays(null);
+            return;
+        }
+
+        const studentRecords = records.filter(r => r.studentId === selectedStudentId);
+        const uniqueDays = new Set(studentRecords.map(r => r.date));
+        const count = uniqueDays.size;
+        
+        setNonAttendanceDays(count);
+
+        if (count >= 11) {
+            showNotification(
+              `هذا الطالب قد تجاوز الحد الأقصى للغياب وهو 10 أيام (${count} يومًا). لا يمكنك إضافة إذن جديد.`,
+              'error'
+            );
+        } else if (count >= 8) {
+            showNotification(
+              `تنبيه: هذا الطالب لديه ${count} أيام غياب. الحد الأقصى المسموح به هو 10 أيام.`,
+              'error' // Using 'error' for high visibility like a warning
+            );
+        }
+    }, [selectedStudentId, records, showNotification]);
     
     const filteredStudentsByClass = useMemo(() => {
         if (!selectedClassId) return [];
@@ -72,6 +99,15 @@ export const PermissionsView: React.FC = () => {
             setReason('');
         }
     };
+
+    const countColor = useMemo(() => {
+        if (nonAttendanceDays === null) return '';
+        if (nonAttendanceDays >= 11) return 'text-red-600 font-bold';
+        if (nonAttendanceDays >= 8) return 'text-yellow-600 font-bold';
+        return 'text-slate-600';
+    }, [nonAttendanceDays]);
+
+    const isSubmissionBlocked = nonAttendanceDays !== null && nonAttendanceDays >= 11;
 
     if (loading) {
         return <div className="text-center p-8">...جاري تحميل البيانات</div>;
@@ -156,6 +192,15 @@ export const PermissionsView: React.FC = () => {
                     </div>
                 </div>
 
+                 {nonAttendanceDays !== null && (
+                    <div className="text-center p-2 bg-slate-100 rounded-md">
+                        <p className={`text-sm ${countColor}`}>
+                            مجموع أيام عدم الحضور (غياب/إذن/مرض): {nonAttendanceDays} يومًا
+                        </p>
+                    </div>
+                )}
+
+
                 <div>
                      <label className="block text-lg font-semibold text-slate-700 mb-3">نوع الإذن</label>
                      <div className="flex items-center gap-8">
@@ -197,8 +242,13 @@ export const PermissionsView: React.FC = () => {
                 </div>
 
                 <div className="pt-4 border-t">
-                     <button type="submit" className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg text-lg transition-all duration-300 transform hover:scale-105">
-                        تسجيل الإذن
+                     <button 
+                        type="submit" 
+                        disabled={isSubmissionBlocked}
+                        className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg text-lg transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-slate-400 disabled:to-slate-500"
+                        title={isSubmissionBlocked ? "لا يمكن إضافة إذن، تم تجاوز الحد الأقصى." : ""}
+                     >
+                        {isSubmissionBlocked ? 'تم الوصول إلى الحد الأقصى' : 'تسجيل الإذن'}
                      </button>
                 </div>
             </form>

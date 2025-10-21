@@ -6,6 +6,10 @@ import { PlusIcon } from '../icons/PlusIcon';
 import { supabase } from '../../supabaseClient';
 import { Pagination } from '../shared/Pagination';
 import { useNotification } from '../../contexts/NotificationContext';
+import { ConfirmationDialog } from '../shared/ConfirmationDialog';
+import { CheckIcon } from '../icons/CheckIcon';
+import { CancelIcon } from '../icons/CancelIcon';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 
 const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -15,11 +19,20 @@ const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, c
     </div>
 );
 
+const roleLabels: { [key in AppRole]: string } = {
+  [AppRole.SUPER_ADMIN]: 'مسؤول عام (Super Admin)',
+  [AppRole.ACADEMIC_ADMIN]: 'مسؤول أكاديمي',
+  [AppRole.DORMITORY_ADMIN]: 'مسؤول سكني',
+};
+
 export const UsersView: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { showNotification } = useNotification();
+    const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
 
     // State for pagination and search
     const [searchQuery, setSearchQuery] = useState('');
@@ -37,9 +50,12 @@ export const UsersView: React.FC = () => {
         return filtered.slice(startIndex, startIndex + itemsPerPage);
     }, [users, searchQuery, currentPage, itemsPerPage]);
 
-    async function fetchUsers() {
+    const fetchUsers = async () => {
         setLoading(true);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            setCurrentUser(user);
+
             const { data, error } = await supabase.from('profiles').select('*').order('username');
             if (error) throw error;
             setUsers(data || []);
@@ -99,12 +115,72 @@ export const UsersView: React.FC = () => {
         setIsSubmitting(false);
     };
 
+    const handleEditUser = (user: User) => {
+        setEditingUser({ ...user });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingUser(null);
+    };
+
+    const handleUpdateUser = async () => {
+        if (!editingUser) return;
+        
+        const { error } = await supabase
+            .from('profiles')
+            .update({ role: editingUser.role })
+            .eq('id', editingUser.id);
+            
+        if (error) {
+            showNotification(`فشل تحديث المستخدم: ${error.message}`, 'error');
+        } else {
+            showNotification('تم تحديث دور المستخدم بنجاح.', 'success');
+            setEditingUser(null);
+            fetchUsers();
+        }
+    };
+    
+    const requestDeleteUser = (user: User) => {
+        setConfirmDelete(user);
+    };
+
+    const executeDeleteUser = async () => {
+        if (!confirmDelete) return;
+
+        if (currentUser && currentUser.id === confirmDelete.id) {
+            showNotification("لا يمكنك حذف حسابك الخاص.", 'error');
+            setConfirmDelete(null);
+            return;
+        }
+        
+        const { error } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', confirmDelete.id);
+
+        if (error) {
+            showNotification(`فشل حذف ملف المستخدم: ${error.message}`, 'error');
+        } else {
+            showNotification('تم حذف ملف المستخدم بنجاح. لن يتمكن المستخدم من تسجيل الدخول.', 'success');
+            fetchUsers();
+        }
+        setConfirmDelete(null);
+    };
+
+
     if (loading && users.length === 0) {
         return <div className="text-center p-8">...جاري تحميل المستخدمين</div>;
     }
 
     return (
         <div className="space-y-6">
+             <ConfirmationDialog
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDeleteUser}
+                title="تأكيد حذف المستخدم"
+                message={`هل أنت متأكد أنك تريد حذف المستخدم ${confirmDelete?.username}؟ سيتم حذف ملفه الشخصي ولن يتمكن من تسجيل الدخول. لا يمكن التراجع عن هذا الإجراء.`}
+            />
             <h2 className="text-3xl font-bold text-slate-800">إدارة المستخدمين</h2>
 
             <Card title="إضافة مستخدم جديد">
@@ -120,9 +196,9 @@ export const UsersView: React.FC = () => {
                     <div>
                         <label htmlFor="role" className="block text-sm font-medium text-slate-600 mb-1">الدور</label>
                         <select ref={roleRef} id="role" className="w-full p-2 border rounded-md bg-white" defaultValue={AppRole.ACADEMIC_ADMIN}>
-                            <option value={AppRole.ACADEMIC_ADMIN}>مسؤول أكاديمي</option>
-                            <option value={AppRole.DORMITORY_ADMIN}>مسؤول سكني</option>
-                            <option value={AppRole.SUPER_ADMIN}>مسؤول عام (Super Admin)</option>
+                            <option value={AppRole.ACADEMIC_ADMIN}>{roleLabels[AppRole.ACADEMIC_ADMIN]}</option>
+                            <option value={AppRole.DORMITORY_ADMIN}>{roleLabels[AppRole.DORMITORY_ADMIN]}</option>
+                            <option value={AppRole.SUPER_ADMIN}>{roleLabels[AppRole.SUPER_ADMIN]}</option>
                         </select>
                     </div>
                     <button type="submit" disabled={isSubmitting} className="w-full mt-2 flex items-center justify-center gap-2 bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50">
@@ -156,22 +232,60 @@ export const UsersView: React.FC = () => {
                                     </td>
                                 </tr>
                             ) : (
-                                paginatedUsers.map((user) => (
-                                    <tr key={user.id} className="bg-white border-b hover:bg-slate-50">
-                                        <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap font-semibold">{user.username}</td>
-                                        <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">{user.role}</td>
-                                        <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
-                                            <div className="flex gap-3 justify-end">
-                                                <button className="text-blue-400 cursor-not-allowed" title="ميزة التعديل قيد التطوير">
-                                                    <EditIcon className="w-5 h-5" />
-                                                </button>
-                                                <button className="text-red-400 cursor-not-allowed" title="الحذف يتطلب أذونات المسؤول من جانب الخادم">
-                                                    <DeleteIcon className="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                                paginatedUsers.map((user) => {
+                                    const isEditing = editingUser?.id === user.id;
+                                    const isCurrentUser = currentUser?.id === user.id;
+
+                                    return (
+                                        <tr key={user.id} className="bg-white border-b hover:bg-slate-50">
+                                            <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap font-semibold">{user.username}</td>
+                                            <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                {isEditing ? (
+                                                     <select
+                                                        value={editingUser!.role}
+                                                        onChange={(e) => setEditingUser({ ...editingUser!, role: e.target.value as AppRole })}
+                                                        className="w-full p-1 border rounded bg-white"
+                                                    >
+                                                        <option value={AppRole.ACADEMIC_ADMIN}>{roleLabels[AppRole.ACADEMIC_ADMIN]}</option>
+                                                        <option value={AppRole.DORMITORY_ADMIN}>{roleLabels[AppRole.DORMITORY_ADMIN]}</option>
+                                                        <option value={AppRole.SUPER_ADMIN}>{roleLabels[AppRole.SUPER_ADMIN]}</option>
+                                                    </select>
+                                                ) : (
+                                                    roleLabels[user.role] || user.role
+                                                )}
+                                            </td>
+                                            <td className="px-2 py-3 sm:px-6 sm:py-4 whitespace-nowrap">
+                                                <div className="flex gap-3 justify-end">
+                                                    {isEditing ? (
+                                                        <>
+                                                            <button onClick={handleUpdateUser} className="text-green-600 hover:text-green-800" title="حفظ"><CheckIcon className="w-5 h-5" /></button>
+                                                            <button onClick={handleCancelEdit} className="text-red-600 hover:text-red-800" title="إلغاء"><CancelIcon className="w-5 h-5" /></button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleEditUser(user)}
+                                                                disabled={isCurrentUser}
+                                                                className="text-blue-600 hover:text-blue-800 disabled:text-blue-300 disabled:cursor-not-allowed"
+                                                                title={isCurrentUser ? "لا يمكنك تعديل حسابك الخاص" : "تعديل المستخدم"}
+                                                            >
+                                                                <EditIcon className="w-5 h-5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => requestDeleteUser(user)}
+                                                                disabled={isCurrentUser}
+                                                                className="text-red-600 hover:text-red-800 disabled:text-red-300 disabled:cursor-not-allowed"
+                                                                title={isCurrentUser ? "لا يمكنك حذف حسابك الخاص" : "حذف المستخدم"}
+                                                            >
+                                                                <DeleteIcon className="w-5 h-5" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>

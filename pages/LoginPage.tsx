@@ -182,12 +182,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       <div className="relative z-10 w-full max-w-md mx-auto space-y-4 sm:space-y-6">
         <div className="text-center space-y-2">
           <Logo className="mx-auto text-white h-14 w-14 sm:h-20 sm:w-20" />
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-300 drop-shadow-lg">
-            نظام كشف الغياب والأذونات
-          </h1>
-          <p className="text-lg sm:text-xl font-semibold text-slate-200 drop-shadow-md">
-            جامعة الإمام الشافعي
-          </p>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-slate-300 drop-shadow-lg">
+              نظام كشف الغياب والإذن
+            </h1>
+            <p className="mt-1 text-lg sm:text-xl font-medium text-slate-200 drop-shadow">
+              جامعة الإمام الشافعي
+            </p>
+          </div>
         </div>
 
         <div className="bg-black/30 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-white/20 shadow-2xl space-y-4 sm:space-y-6">
